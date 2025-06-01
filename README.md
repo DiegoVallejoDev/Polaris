@@ -1,10 +1,8 @@
 # POLARIS
 
-**POLARIS** (Policy Optimization via Layered Agents and Recursive Inference Search) is a novel decision-making framework designed to simulate parallel lines of reasoning across agents with varied internal parameters. It extends Monte Carlo Tree Search (MCTS) by embedding agent diversity at each node and introducing a meta-evaluator called the **Sentinel Agent**, which provides external, corrective insight during the backpropagation phase.
+![Screenshot_20250601_154253_Chrome](https://github.com/user-attachments/assets/651b4783-9175-4970-a965-18065ce817ec)
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/e91c3fcc-7508-40fc-b0c2-0e3a9b3376d7" alt="POLARIS" width="300"/>
-</p>
+**POLARIS** (Policy Optimization via Layered Agents and Recursive Inference Search) is a novel decision-making framework designed to simulate parallel lines of reasoning across agents with varied internal parameters. It extends Monte Carlo Tree Search (MCTS) by embedding agent diversity at each node and introducing a meta-evaluator called the **Sentinel Agent**, which provides external, corrective insight during the backpropagation phase.
 
 ---
 
