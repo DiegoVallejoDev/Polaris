@@ -28,23 +28,10 @@ Each POLARIS node represents a snapshot of deliberation made by an agent with sl
 
 ## Architecture Overview
 
-```mermaid
-graph TD
-  A[Root Node]
-  A --> B1[Agent A - Heuristic Bias]
-  A --> B2[Agent B - Risk-Tolerant]
-  A --> B3[Agent C - Defensive]
-  B1 --> C1[Child A1]
-  B1 --> C2[Child A2]
-  B2 --> C3[Child B1]
-  B3 --> C4[Child C1]
-  C1 --> D[Backpropagation]
-  D --> E[Sentinel Agent]
-  E --> F[Adjusted Scores]
-  F --> A
-```
+![Untitled-2025-05-31-2220](https://github.com/user-attachments/assets/1ac026c5-7d50-4421-9c0d-2cbbd45dd412)
 
 ---
+
 
 
 
