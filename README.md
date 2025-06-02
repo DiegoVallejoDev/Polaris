@@ -26,7 +26,8 @@ Each POLARIS node represents a snapshot of deliberation made by an agent with sl
 
 ## Architecture Overview
 
-![Untitled-2025-05-31-2220](https://github.com/user-attachments/assets/1ac026c5-7d50-4421-9c0d-2cbbd45dd412)
+
+![1748827789805500463448285727694](https://github.com/user-attachments/assets/3584fc85-ca3b-4b08-8bd3-3aa9cf3db53d)
 
 ---
 
