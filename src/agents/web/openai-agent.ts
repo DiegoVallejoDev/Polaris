@@ -64,21 +64,29 @@ export class OpenAIAgent extends BaseAgent {
       name: config.name || "OpenAI-GPT",
       provider: "openai",
       apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-      model: config.model || "gpt-3.5-turbo",
+      model: config.model || "gpt-4o-mini",
       temperature: config.temperature || 0.7,
       maxTokens: config.maxTokens || 1000,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
 
     // Initialize HTTP client
+    const headers: any = {
+      Authorization: `Bearer ${this.config.apiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    // Add project ID if available
+    const projectId =
+      process.env.OPENAI_PROJECT_ID || "proj_ZnXApPLTnfWhXlp0dZhC7aCd";
+    if (projectId) {
+      headers["OpenAI-Project"] = projectId;
+    }
+
     this.httpClient = axios.create({
       baseURL: EnvironmentConfig.OPENAI.baseURL || "https://api.openai.com/v1",
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-        "OpenAI-Project": process.env.OPENAI_PROJECT_ID || "",
-      },
-      timeout: EnvironmentConfig.OPENAI.timeout || 30000,
+      headers,
+      timeout: EnvironmentConfig.OPENAI.timeout || 45000,
     });
 
     this.systemPrompt =
@@ -118,58 +126,98 @@ export class OpenAIAgent extends BaseAgent {
     }
 
     const startTime = performance.now();
+    const maxRetries = 3;
+    let lastError: any;
 
-    try {
-      this.statistics.totalEvaluations++;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.statistics.totalEvaluations++;
 
-      // Prepare the evaluation prompt
-      const prompt = this.buildEvaluationPrompt(gameState);
+        // Prepare the evaluation prompt
+        const prompt = this.buildEvaluationPrompt(gameState);
 
-      // Make API call to OpenAI
-      const response = await this.httpClient.post("/chat/completions", {
-        model: this.config.model,
-        messages: [
-          { role: "system", content: this.systemPrompt },
-          { role: "user", content: prompt },
-        ],
-        temperature: this.config.temperature,
-        max_tokens: this.config.maxTokens,
-        response_format: { type: "json_object" },
-      });
+        // Make API call to OpenAI
+        const response = await this.httpClient.post("/chat/completions", {
+          model: this.config.model,
+          messages: [
+            { role: "system", content: this.systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          temperature: this.config.temperature,
+          max_tokens: this.config.maxTokens,
+          response_format: { type: "json_object" },
+        });
 
-      const openaiResponse: OpenAIResponse = response.data;
-      const evaluation = this.parseEvaluationResponse(openaiResponse);
+        const openaiResponse: OpenAIResponse = response.data;
+        const evaluation = this.parseEvaluationResponse(openaiResponse);
 
-      // Update statistics
-      const evaluationTime = performance.now() - startTime;
-      evaluation.evaluationTime = evaluationTime;
-      this.updateStatistics(evaluation);
+        // Update statistics
+        const evaluationTime = performance.now() - startTime;
+        evaluation.evaluationTime = evaluationTime;
+        this.updateStatistics(evaluation);
 
-      this.logger.debug("OpenAI evaluation completed", {
-        gameStateId: gameState.id,
-        evaluationTime,
-        confidence: evaluation.confidence,
-        tokensUsed: openaiResponse.usage.total_tokens,
-      });
+        this.logger.debug("OpenAI evaluation completed", {
+          gameStateId: gameState.id,
+          evaluationTime,
+          confidence: evaluation.confidence,
+          tokensUsed: openaiResponse.usage.total_tokens,
+        });
 
-      return evaluation;
-    } catch (error) {
-      this.statistics.errorCount++;
-      this.logger.error("OpenAI evaluation failed", error);
+        return evaluation;
+      } catch (error: any) {
+        lastError = error;
+        this.statistics.errorCount++;
 
-      // Return a default evaluation on error
-      return {
-        agentId: this.id,
-        score: 0.5, // Neutral score
-        confidence: 0.1, // Low confidence
-        reasoning: `Evaluation failed: ${error}`,
-        metadata: {
-          error: true,
-          errorMessage: String(error),
-          evaluationTime: performance.now() - startTime,
-        },
-      };
+        // Check if this is a rate limit error (429)
+        if (error.response?.status === 429 && attempt < maxRetries) {
+          // Parse retry-after header if available
+          const retryAfterHeader = error.response?.headers?.["retry-after"];
+          const retryAfterMs = retryAfterHeader
+            ? parseInt(retryAfterHeader) * 1000
+            : null;
+
+          // Use longer delays for rate limits: 10s, 30s, 60s
+          const baseDelays = [10000, 30000, 60000];
+          const retryDelay = retryAfterMs || baseDelays[attempt - 1] || 60000;
+
+          this.logger.warn(
+            `Rate limit hit, retrying in ${retryDelay}ms (attempt ${attempt}/${maxRetries})`
+          );
+          if (retryAfterHeader) {
+            this.logger.info(
+              `Using retry-after header value: ${retryAfterHeader} seconds`
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        this.logger.error(
+          `OpenAI evaluation failed (attempt ${attempt}/${maxRetries})`,
+          error
+        );
+
+        // If this was the last attempt or not a retryable error, break
+        if (attempt === maxRetries || error.response?.status !== 429) {
+          break;
+        }
+      }
     }
+
+    // Return a default evaluation on error
+    return {
+      agentId: this.id,
+      score: 0.5, // Neutral score
+      confidence: 0.1, // Low confidence
+      reasoning: `Evaluation failed after ${maxRetries} attempts: ${lastError}`,
+      metadata: {
+        error: true,
+        errorMessage: String(lastError),
+        evaluationTime: performance.now() - startTime,
+        maxRetries,
+      },
+    };
   }
 
   async selectAction(_state: GameState, actions: Action[]): Promise<Action> {

@@ -54,7 +54,7 @@ export class WebAgentFactory {
           name: config.name || "OpenAI-GPT",
           provider: "openai",
           apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-          model: config.model || "gpt-3.5-turbo",
+          model: config.model || "gpt-4o-mini",
           temperature: config.temperature || 0.7,
           maxTokens: config.maxTokens || 1000,
           systemPrompt: config.systemPrompt,
@@ -103,7 +103,8 @@ export class WebAgentFactory {
         agents.push(
           this.createAgent({
             provider: "openai",
-            name: "GPT-4-Chess-Analyst",
+            name: "GPT-4o-Mini-Chess-Analyst",
+            model: "gpt-4o-mini",
           })
         );
       }
