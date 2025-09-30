@@ -19,6 +19,14 @@ import { PolarisError } from "../../errors/base";
 export type ChessBoard = (ChessPiece | null)[][];
 
 /**
+ * Convert currentPlayer number to Color enum
+ * Player 1 = WHITE, Player 2 = BLACK
+ */
+function playerToColor(player: number): Color {
+  return player === 1 ? Color.WHITE : Color.BLACK;
+}
+
+/**
  * Chess game status
  */
 export enum GameStatus {
@@ -153,7 +161,7 @@ export class ChessState extends BaseGameState {
    * Check if the current player is in check
    */
   isInCheck(color?: Color): boolean {
-    const kingColor = color || (this.currentPlayer as Color);
+    const kingColor = color || playerToColor(this.currentPlayer);
     const king = this.findKing(kingColor);
 
     if (!king) {
@@ -169,7 +177,9 @@ export class ChessState extends BaseGameState {
    */
   getAvailableActions(): ChessAction[] {
     const actions: ChessAction[] = [];
-    const playerPieces = this.getPiecesOfColor(this.currentPlayer as Color);
+    const playerPieces = this.getPiecesOfColor(
+      playerToColor(this.currentPlayer)
+    );
 
     for (const piece of playerPieces) {
       const pieceActions = this.getLegalMovesForPiece(piece);
@@ -217,13 +227,13 @@ export class ChessState extends BaseGameState {
     }
 
     // Increment fullmove number after black's move
-    if (this.currentPlayer === Color.BLACK) {
+    const currentColor = playerToColor(this.currentPlayer);
+    if (currentColor === Color.BLACK) {
       newFullmoveNumber++;
     }
 
     // Create new state
-    const nextPlayer =
-      this.currentPlayer === Color.WHITE ? Color.BLACK : Color.WHITE;
+    const nextPlayer = currentColor === Color.WHITE ? Color.BLACK : Color.WHITE;
     const newState = new ChessState(
       ChessState.generateStateId(),
       newBoard,
@@ -254,7 +264,8 @@ export class ChessState extends BaseGameState {
     }
 
     // Check if piece belongs to current player
-    if (action.piece.color !== this.currentPlayer) {
+    const currentColor = playerToColor(this.currentPlayer);
+    if (action.piece.color !== currentColor) {
       return false;
     }
 
@@ -272,7 +283,7 @@ export class ChessState extends BaseGameState {
 
     // Check if move would leave king in check
     const testState = this.createTestState(action);
-    if (testState.isInCheck(this.currentPlayer as Color)) {
+    if (testState.isInCheck(playerToColor(this.currentPlayer))) {
       return false;
     }
 
@@ -366,7 +377,7 @@ export class ChessState extends BaseGameState {
     return new ChessState(
       undefined, // Generate new ID
       this.getBoard(),
-      this.currentPlayer as Color,
+      playerToColor(this.currentPlayer),
       { ...this.castlingRights },
       this.enPassantTarget ? { ...this.enPassantTarget } : null,
       this.halfmoveClock,
@@ -379,7 +390,8 @@ export class ChessState extends BaseGameState {
    */
   getFEN(): string {
     const position = this.getFENPosition();
-    const activeColor = this.currentPlayer === Color.WHITE ? "w" : "b";
+    const activeColor =
+      playerToColor(this.currentPlayer) === Color.WHITE ? "w" : "b";
     const castling = this.getFENCastling();
     const enPassant = this.enPassantTarget
       ? `${this.enPassantTarget.file}${this.enPassantTarget.rank}`
@@ -618,7 +630,7 @@ export class ChessState extends BaseGameState {
     return new ChessState(
       undefined,
       testBoard,
-      this.currentPlayer as Color,
+      playerToColor(this.currentPlayer),
       { ...this.castlingRights },
       this.enPassantTarget,
       this.halfmoveClock,
