@@ -64,7 +64,7 @@ export class OpenAIAgent extends BaseAgent {
       name: config.name || "OpenAI-GPT",
       provider: "openai",
       apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-      model: config.model || "gpt-4",
+      model: config.model || "gpt-3.5-turbo",
       temperature: config.temperature || 0.7,
       maxTokens: config.maxTokens || 1000,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
