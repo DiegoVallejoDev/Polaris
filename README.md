@@ -17,15 +17,15 @@
 
 ### Layered Cognitive Reasoning
 
-Inspired by Daniel Kahneman’s *Thinking, Fast and Slow*, POLARIS organizes decision-making in layers:
+Inspired by Daniel Kahneman’s _Thinking, Fast and Slow_, POLARIS organizes decision-making in layers:
 
 _Reflex < Impulse < Heuristic < Deliberation < Meta-Reasoning < Polaris_
 
-This layered framework mirrors the spectrum of cognition—from the instinctual responses of System 1 to the methodical analysis of System 2—and then goes a step further. POLARIS does not merely alternate between fast and slow thinking; it *orchestrates* them. By embedding a variety of agents at each node—ranging from reactive evaluators to symbolic reasoners or large language models—POLARIS constructs a collaborative battlefield of perspectives.
+This layered framework mirrors the spectrum of cognition—from the instinctual responses of System 1 to the methodical analysis of System 2—and then goes a step further. POLARIS does not merely alternate between fast and slow thinking; it _orchestrates_ them. By embedding a variety of agents at each node—ranging from reactive evaluators to symbolic reasoners or large language models—POLARIS constructs a collaborative battlefield of perspectives.
 
 This is where the innovation lies: instead of choosing the best single model, POLARIS creates an ecosystem of thought. Each simulation is not just a roll of the dice, but a simulated debate, with the **Sentinel Agent** acting as a moderator who watches the entire tree, evaluates diversity, coherence, and surprise, and selectively reinforces strategies that reflect strategic adaptability and long-term insight.
 
-This approach is not just scalable. It's epistemologically *layered*.
+This approach is not just scalable. It's epistemologically _layered_.
 
 Each POLARIS node represents a snapshot of deliberation made by an agent with slightly different internal reasoning biases, allowing for a rich landscape of possible outcomes to be explored.
 
@@ -53,25 +53,25 @@ npm install polaris-framework
 ```
 
 ```typescript
-import { 
-  PolarisEngine, 
-  SentinelAgent, 
-  SearchAlgorithm, 
-  AgentSelector 
-} from 'polaris-framework';
+import {
+  PolarisEngine,
+  SentinelAgent,
+  SearchAlgorithm,
+  AgentSelector,
+} from "polaris-framework";
 
 // Create agents with different reasoning styles
 const agents = [
-  new OpenAIAgent({ model: 'gpt-4', temperature: 0.7 }),
+  new OpenAIAgent({ model: "gpt-4", temperature: 0.7 }),
   new MinimaxAgent({ maxDepth: 8 }),
-  new CustomAgent({ strategy: 'aggressive' })
+  new CustomAgent({ strategy: "aggressive" }),
 ];
 
 // Configure the Sentinel for bias detection
 const sentinel = new SentinelAgent({
   diversityThreshold: 0.3,
   biasDetectionEnabled: true,
-  correctionStrength: 0.5
+  correctionStrength: 0.5,
 });
 
 // Run POLARIS search
@@ -85,12 +85,14 @@ const result = await polaris.search(gameState);
 ### **Core Components**
 
 #### **🎯 MCTS with Agent Diversity**
+
 - **Multi-Agent Search**: Unlike traditional MCTS, POLARIS coordinates multiple heterogeneous agents
 - **Selection Strategies**: Round-robin, performance-based, diversity-maximizing, adaptive
 - **Progressive Widening**: Efficient action space exploration
 - **Early Termination**: Smart stopping conditions based on confidence and score differences
 
 #### **🛡️ Sentinel Agent System**
+
 The Sentinel Agent acts as a meta-observer during search:
 
 - **Bias Detection**: Identifies 6 types of bias (systematic, temporal, positional, confirmation, anchoring, groupthink)
@@ -99,14 +101,17 @@ The Sentinel Agent acts as a meta-observer during search:
 - **Intervention Tracking**: Learns from past corrections for continuous improvement
 
 #### **🧮 Advanced Mathematics**
+
 - **Statistical Analysis**: Entropy, variance, correlation, UCB1 calculations
-- **Normalization**: Score standardization across different agent types  
+- **Normalization**: Score standardization across different agent types
 - **Seeded Randomness**: Reproducible results for testing and debugging
 
 ## ✨ **Key Features**
 
 ### **Agent-Agnostic Design**
+
 POLARIS works with any agent that implements the `Agent` interface:
+
 ```typescript
 interface Agent {
   evaluate(state: GameState): Promise<EvaluationResult>;
@@ -115,13 +120,16 @@ interface Agent {
 ```
 
 ### **Meta-Cognitive Oversight**
+
 The Sentinel Agent provides "System 2" thinking that observes and corrects the search process:
+
 - Detects when agents are too similar (groupthink)
-- Identifies systematic biases in evaluations  
+- Identifies systematic biases in evaluations
 - Applies corrections to improve decision quality
 - Tracks intervention effectiveness over time
 
 ### **Production-Ready Architecture**
+
 - **Type Safety**: Full TypeScript implementation with strict typing
 - **Error Handling**: Graceful degradation and comprehensive error reporting
 - **Memory Management**: Efficient tree pruning and memory-aware operations
@@ -130,14 +138,16 @@ The Sentinel Agent provides "System 2" thinking that observes and corrects the s
 ## 🎮 **Current Capabilities**
 
 ### **Working Components** ✅
+
 - **Core Framework**: Types, domains, agents, tree structure
-- **Search Algorithms**: Complete MCTS with agent coordination  
+- **Search Algorithms**: Complete MCTS with agent coordination
 - **Sentinel System**: Bias detection and diversity analysis
 - **Mathematical Utilities**: Advanced statistical functions
 - **Logging System**: Structured logging with multiple levels
 - **Demo Application**: Working foundation demonstration
 
 ### **In Development** 🚧
+
 - **POLARIS Engine**: Main orchestration class (60% complete)
 - **Chess Domain**: Concrete game implementation for demos
 - **Web API Agents**: OpenAI, Anthropic, Google integrations
@@ -146,21 +156,25 @@ The Sentinel Agent provides "System 2" thinking that observes and corrects the s
 ## 🔬 **Why POLARIS?**
 
 ### **Parallel Reasoning**
+
 Simulates multiple styles of thought simultaneously, from reactive to deliberative reasoning.
 
-### **Strategic Exploration** 
+### **Strategic Exploration**
+
 Embraces diversity without degeneracy through intelligent agent selection and bias correction.
 
 ### **Meta-Cognitive Oversight**
+
 Backpropagation is enriched by layered insight from the Sentinel Agent's analysis.
 
 ### **General-Purpose Framework**
+
 Applicable beyond games to planning, optimization, multi-objective decision-making, and more.
 
 ## 🎯 **Use Cases**
 
 - **Game AI**: Chess, Go, strategic games with complex decision trees
-- **Planning Systems**: Resource allocation, scheduling, route optimization  
+- **Planning Systems**: Resource allocation, scheduling, route optimization
 - **Multi-Objective Optimization**: Balancing competing constraints and objectives
 - **AI Research**: Studying bias, diversity, and meta-cognitive reasoning
 - **Decision Support**: High-stakes decisions requiring multiple perspectives
@@ -168,27 +182,29 @@ Applicable beyond games to planning, optimization, multi-objective decision-maki
 ## 📊 **Performance**
 
 Current benchmarks on the foundation demo:
+
 - **Tree Operations**: ~1000 nodes/second with full statistics
 - **Mathematical Utilities**: Sub-millisecond calculations for most operations
 - **Memory Efficiency**: Automatic pruning keeps memory usage under 100MB
 - **Agent Coordination**: Handles 5+ diverse agents with minimal overhead
 
-
-
 ## 🔮 **Future Roadmap**
 
 ### **Phase 1: Core Engine** (Current)
+
 - ✅ Foundation framework with MCTS and Sentinel system
 - 🚧 Main POLARIS Engine orchestration class
 - 🚧 Chess domain for concrete demonstrations
 
 ### **Phase 2: AI Integration** (Next)
+
 - 🔄 OpenAI GPT integration for natural language reasoning
-- 🔄 Anthropic Claude integration for analytical thinking  
+- 🔄 Anthropic Claude integration for analytical thinking
 - 🔄 Google Gemini integration for multimodal reasoning
 - 🔄 Local Ollama support for privacy-focused deployments
 
 ### **Phase 3: Real-World Applications** (Future)
+
 - 🔄 Strategic planning and resource optimization
 - 🔄 Multi-agent simulations and game theory
 - 🔄 Autonomous navigation and pathfinding
@@ -200,6 +216,7 @@ Current benchmarks on the foundation demo:
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### **Development Setup**
+
 ```bash
 git clone https://github.com/DiegoVallejoDev/Polaris.git
 cd Polaris
@@ -209,10 +226,11 @@ npm test     # Run test suite
 ```
 
 ### **Project Structure**
+
 ```
 src/
 ├── core/          # MCTS tree and search algorithms
-├── agents/        # Agent interfaces and implementations  
+├── agents/        # Agent interfaces and implementations
 ├── sentinel/      # Bias detection and diversity analysis
 ├── domains/       # Game states and action definitions
 ├── types/         # TypeScript type definitions
