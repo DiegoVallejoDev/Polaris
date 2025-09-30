@@ -6,7 +6,7 @@
 
 ## 🎉 **Current Status: Production-Ready Framework**
 
-✅ **Working Demo Available** - Run `npm run example:foundation`  
+✅ **Working Demo Available** - Run `pnpm run example:foundation`  
 ✅ **Complete Implementation** - All core components functional  
 ✅ **AI Integrations Ready** - Google Gemini & Anthropic Claude fully working  
 ✅ **TypeScript Ready** - Full type safety and modern architecture  
@@ -39,13 +39,13 @@ Each POLARIS node represents a snapshot of deliberation made by an agent with sl
 # Clone and install
 git clone https://github.com/DiegoVallejoDev/Polaris.git
 cd Polaris
-npm install
+pnpm install
 
 # Build the framework
-npm run build
+pnpm run build
 
 # Run the foundation demo
-npm run example:foundation
+pnpm run example:foundation
 
 # Test API integrations
 pnpm run test:api-keys
@@ -54,10 +54,10 @@ pnpm run test:api-keys
 npx ts-node test-web-agents.ts
 ```
 
-## 📦 **Installation**
+## 📦 **Installation** (WIP)
 
 ```bash
-npm install polaris-framework
+pnpm install polaris-framework
 ```
 
 ```typescript
@@ -235,9 +235,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ```bash
 git clone https://github.com/DiegoVallejoDev/Polaris.git
 cd Polaris
-npm install
-npm run dev  # Watch mode compilation
-npm test     # Run test suite
+pnpm install
+pnpm run dev  # Watch mode compilation
+pnpm test     # Run test suite
 ```
 
 ### **Project Structure**
