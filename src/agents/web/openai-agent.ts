@@ -46,7 +46,6 @@ interface OpenAIResponse {
 export class OpenAIAgent extends BaseAgent {
   private config: OpenAIConfig;
   private httpClient: AxiosInstance;
-  private systemPrompt: string;
   private logger: Logger;
 
   constructor(config: OpenAIConfig) {
@@ -64,7 +63,7 @@ export class OpenAIAgent extends BaseAgent {
       name: config.name || "OpenAI-GPT",
       provider: "openai",
       apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-      model: config.model || "gpt-4o-mini",
+      model: config.model || "gpt-4o",
       temperature: config.temperature || 0.7,
       maxTokens: config.maxTokens || 1000,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
@@ -89,8 +88,6 @@ export class OpenAIAgent extends BaseAgent {
       timeout: EnvironmentConfig.OPENAI.timeout || 45000,
     });
 
-    this.systemPrompt =
-      this.config.systemPrompt || this.getDefaultSystemPrompt();
     this.logger = new Logger(
       `OpenAIAgent-${this.id}`,
       EnvironmentConfig.POLARIS.logLevel
@@ -133,22 +130,11 @@ export class OpenAIAgent extends BaseAgent {
       try {
         this.statistics.totalEvaluations++;
 
-        // Prepare the evaluation prompt
-        const prompt = this.buildEvaluationPrompt(gameState);
+        // Prepare the evaluation input (simplified format)
+        const input = this.buildEvaluationPrompt(gameState);
 
-        // Make API call to OpenAI
-        const response = await this.httpClient.post("/chat/completions", {
-          model: this.config.model,
-          messages: [
-            { role: "system", content: this.systemPrompt },
-            { role: "user", content: prompt },
-          ],
-          temperature: this.config.temperature,
-          max_tokens: this.config.maxTokens,
-          response_format: { type: "json_object" },
-        });
-
-        const openaiResponse: OpenAIResponse = response.data;
+        // Make API call using simplified format similar to curl example
+        const openaiResponse = await this.makeSimplifiedAPICall(input);
         const evaluation = this.parseEvaluationResponse(openaiResponse);
 
         // Update statistics
@@ -270,35 +256,33 @@ export class OpenAIAgent extends BaseAgent {
   }
 
   private buildEvaluationPrompt(gameState: GameState): string {
-    return `
-Please evaluate the following game state and provide a comprehensive analysis.
+    return `Analyze this chess position and provide evaluation as JSON: State ID: ${gameState.id}, Player: ${gameState.currentPlayer}, Turn: ${gameState.getTurnNumber()}, Data: ${JSON.stringify(gameState.serialize())}. Return {"score": 0-1, "confidence": 0-1, "reasoning": "explanation"}.`;
+  }
 
-Game State Information:
-- State ID: ${gameState.id}
-- Current Player: ${gameState.currentPlayer}
-- Turn Number: ${gameState.getTurnNumber()}
-- Is Terminal: ${gameState.isTerminal}
-- Game-specific Data: ${JSON.stringify(gameState.serialize(), null, 2)}
+  /**
+   * Simplified API call method matching curl example format
+   */
+  private async makeSimplifiedAPICall(input: string): Promise<OpenAIResponse> {
+    try {
+      // Use the simplified format similar to the curl example
+      const response = await this.httpClient.post("/chat/completions", {
+        model: this.config.model,
+        messages: [
+          {
+            role: "user",
+            content: input,
+          },
+        ],
+        temperature: this.config.temperature,
+        max_tokens: this.config.maxTokens,
+        response_format: { type: "json_object" },
+      });
 
-Please analyze this position and provide your evaluation in the following JSON format:
-{
-  "score": <number between 0 and 1, where 0.5 is neutral>,
-  "confidence": <number between 0 and 1 indicating certainty>,
-  "reasoning": "<detailed explanation of your evaluation>",
-  "keyFactors": ["<factor1>", "<factor2>", ...],
-  "recommendedActions": ["<action1>", "<action2>", ...],
-  "tacticalThemes": ["<theme1>", "<theme2>", ...],
-  "positionType": "<opening/middlegame/endgame/etc>",
-  "riskAssessment": "<low/medium/high>"
-}
-
-Focus on:
-1. Material balance and piece activity
-2. King safety and tactical opportunities
-3. Pawn structure and long-term considerations
-4. Control of key squares and files
-5. Overall position assessment from current player's perspective
-`;
+      return response.data;
+    } catch (error) {
+      this.logger.error("Simplified API call failed", error);
+      throw error;
+    }
   }
 
   private parseEvaluationResponse(response: OpenAIResponse): EvaluationResult {

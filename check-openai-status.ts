@@ -51,7 +51,7 @@ async function checkOpenAIStatus() {
 
     // Check if our target models are available
     const models = modelsResponse.data.data.map((m: any) => m.id);
-    const targetModels = ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4"];
+    const targetModels = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4"];
 
     console.log("\n📋 Target Model Availability:");
     targetModels.forEach((model) => {
@@ -74,7 +74,7 @@ async function checkOpenAIStatus() {
     // 2. Test a simple completion request
     console.log("\n2️⃣ Testing Chat Completion...");
     const testResponse = await client.post("/chat/completions", {
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         {
           role: "user",
