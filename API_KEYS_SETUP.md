@@ -52,10 +52,10 @@ Edit the `.env` file and replace the placeholder values:
 
 ```bash
 # Required for OpenAI agents
-OPENAI_API_KEY=sk-proj-your-actual-openai-key-here
+OPENAI_API_KEY=sk-proj-YOUR_OPENAI_KEY_HERE
 
 # Required for Anthropic agents
-ANTHROPIC_API_KEY=sk-ant-your-actual-anthropic-key-here
+ANTHROPIC_API_KEY=sk-ant-api03-YOUR_ANTHROPIC_KEY_HERE
 
 # Required for Google agents
 GOOGLE_API_KEY=your-actual-google-api-key-here
@@ -198,8 +198,8 @@ ENABLE_METRICS=true
 cat .env | grep API_KEY
 
 # Ensure no spaces around the = sign
-OPENAI_API_KEY=sk-proj-... # ✅ Correct
-OPENAI_API_KEY = sk-proj-... # ❌ Wrong
+OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE # ✅ Correct
+OPENAI_API_KEY = sk-proj-YOUR_KEY_HERE # ❌ Wrong
 ```
 
 #### **"Rate limit exceeded" error**
