@@ -11,9 +11,12 @@
     "test:watch": "jest --watch",
     "clean": "rimraf dist",
     "prepack": "npm run clean && npm run build",
+    "demo": "tsc && node dist/demo/working-demo.js",
+    "demo:foundation": "ts-node src/demo/foundation-demo.ts",
     "example:foundation": "ts-node examples/foundation-demo.ts",
     "example:enhanced": "ts-node examples/enhanced-demo.ts",
     "example:chess": "ts-node examples/chess-game.ts",
+    "test:api-keys": "ts-node scripts/test-api-keys.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"
   },
@@ -50,6 +53,7 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
+    "dotenv": "^16.6.1",
     "uuid": "^9.0.0"
   },
   "engines": {

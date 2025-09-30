@@ -60,6 +60,12 @@ export {
 // Utilities
 export { MathUtils, RandomUtils } from "./utils/math";
 export { Logger, LogLevel, PerformanceLogger, logger } from "./utils/logger";
+export {
+  EnvironmentConfig,
+  getEnvVar,
+  getEnvVarAsNumber,
+  getEnvVarAsBoolean,
+} from "./utils/config";
 
 // Errors
 export * from "./errors/base";

@@ -8,8 +8,10 @@
 
 ✅ **Working Demo Available** - Run `npm run example:foundation`  
 ✅ **Complete Implementation** - All core components functional  
+✅ **AI Integrations Ready** - Google Gemini & Anthropic Claude fully working  
 ✅ **TypeScript Ready** - Full type safety and modern architecture  
-✅ **Advanced AI Features** - Bias detection, diversity analysis, meta-cognitive oversight
+✅ **Advanced AI Features** - Bias detection, diversity analysis, meta-cognitive oversight  
+✅ **Recent Bug Fixes** - Major API integration issues resolved (Sept 2025)
 
 ---
 
@@ -44,6 +46,12 @@ npm run build
 
 # Run the foundation demo
 npm run example:foundation
+
+# Test API integrations
+pnpm run test:api-keys
+
+# Test web agents (Google & Anthropic)
+npx ts-node test-web-agents.ts
 ```
 
 ## 📦 **Installation**
@@ -146,11 +154,18 @@ The Sentinel Agent provides "System 2" thinking that observes and corrects the s
 - **Logging System**: Structured logging with multiple levels
 - **Demo Application**: Working foundation demonstration
 
+### **Recently Completed** ✅
+
+- **Web API Agents**: Google Gemini & Anthropic Claude fully integrated
+- **JSON Parsing**: Enhanced parsing for markdown-wrapped responses
+- **API Configuration**: Proper headers and model selection
+- **Error Handling**: Graceful fallback for failed API connections
+
 ### **In Development** 🚧
 
-- **POLARIS Engine**: Main orchestration class (60% complete)
-- **Chess Domain**: Concrete game implementation for demos
-- **Web API Agents**: OpenAI, Anthropic, Google integrations
+- **POLARIS Engine**: Main orchestration class (85% complete)
+- **Chess Domain**: Final TypeScript type casting fixes
+- **OpenAI Integration**: Pending billing/quota resolution
 - **Interactive Examples**: Real-world problem demonstrations
 
 ## 🔬 **Why POLARIS?**
