@@ -8,7 +8,11 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "tsc && node dist/test-agents.js",
+    "test:philosophy": "ts-node test-philosophy.ts",
     "demo": "ts-node examples/demo.ts",
+    "demo:philosophy": "ts-node examples/philosophy-demo.ts",
+    "demo:philosophy:specific": "ts-node examples/philosophy-demo.ts specific",
+    "demo:philosophy:multiple": "ts-node examples/philosophy-demo.ts multiple",
     "clean": "rimraf dist",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"

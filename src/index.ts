@@ -32,6 +32,9 @@ export {
   PositionAnalysis,
 } from "./domains/base/result";
 
+// Philosophy domain
+export * from "./domains/philosophy";
+
 // Types
 export * from "./types/common";
 export * from "./types/evaluation";
