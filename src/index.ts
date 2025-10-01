@@ -67,6 +67,36 @@ export {
   getEnvVarAsBoolean,
 } from "./utils/config";
 
+// Enhanced utilities
+export { Result, Ok, Err, ok, err, tryCatch, tryAsync } from "./utils/result";
+export {
+  Validator,
+  EvaluationValidator,
+  ConfigValidator,
+  ValidationBuilder,
+  validate,
+} from "./utils/validation";
+export {
+  EnhancedEnvironmentConfig,
+  ConfigBuilder,
+  createConfigBuilder,
+  configRegistry,
+} from "./utils/enhanced-config";
+export {
+  StatisticsManager,
+  statisticsManager,
+  withStatistics,
+} from "./utils/statistics";
+export {
+  AgentFactory,
+  AgentFactoryManager,
+  agentFactory,
+  createAgent,
+  createAgents,
+  AgentType,
+  ValidationLevel,
+} from "./utils/agent-factory";
+
 // Errors
 export * from "./errors/base";
 
