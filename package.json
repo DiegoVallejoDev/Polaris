@@ -18,6 +18,7 @@
     "example:chess": "ts-node --project tsconfig.scripts.json examples/chess-game.ts",
     "test:api-keys": "ts-node --project tsconfig.scripts.json scripts/test-api-keys.ts",
     "test:web-agents": "ts-node --project tsconfig.scripts.json test-web-agents.ts",
+    "test:clean-output": "ts-node --project tsconfig.scripts.json test-clean-output.ts",
     "debug:openai": "ts-node --project tsconfig.scripts.json debug-openai.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"

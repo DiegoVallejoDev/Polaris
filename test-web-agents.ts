@@ -100,7 +100,23 @@ async function testWebAgents() {
           await agent.cleanup();
         }
       } catch (error) {
-        console.log(`  ❌ Error: ${error}`);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const cleanError =
+          errorMsg.length > 200 ? errorMsg.substring(0, 200) + "..." : errorMsg;
+        console.log(`  ❌ Error: ${cleanError}`);
+
+        // Log additional details for debugging (but not the full error dump)
+        if (error && typeof error === "object" && "response" in error) {
+          const axiosError = error as any;
+          if (axiosError.response?.status) {
+            console.log(
+              `     Status: ${axiosError.response.status} ${axiosError.response.statusText || ""}`
+            );
+          }
+          if (axiosError.code) {
+            console.log(`     Code: ${axiosError.code}`);
+          }
+        }
       }
     }
 
@@ -108,7 +124,8 @@ async function testWebAgents() {
     console.log("\n✅ All working agents tested successfully");
     console.log("🚀 POLARIS is ready for multi-agent decision making!");
   } catch (error) {
-    console.error("❌ Test failed:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("❌ Test failed:", errorMsg);
   }
 }
 

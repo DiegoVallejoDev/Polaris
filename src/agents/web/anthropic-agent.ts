@@ -101,7 +101,7 @@ export class AnthropicAgent extends BaseAgent {
       this.logger.info("Anthropic agent initialized successfully");
       await super.initialize();
     } catch (error) {
-      this.logger.error("Failed to initialize Anthropic agent", error);
+      this.logger.errorSafe("Failed to initialize Anthropic agent", error);
       throw new PolarisError(
         `Anthropic agent initialization failed: ${error}`,
         "AGENT_INIT_FAILED",
@@ -156,7 +156,7 @@ export class AnthropicAgent extends BaseAgent {
       return evaluation;
     } catch (error) {
       this.statistics.errorCount++;
-      this.logger.error("Anthropic evaluation failed", error);
+      this.logger.errorSafe("Anthropic evaluation failed", error);
 
       // Return a default evaluation on error
       return {

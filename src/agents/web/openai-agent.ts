@@ -108,11 +108,11 @@ export class OpenAIAgent extends BaseAgent {
       this.logger.info("OpenAI agent initialized successfully");
       await super.initialize();
     } catch (error) {
-      this.logger.error("Failed to initialize OpenAI agent", error);
+      this.logger.errorSafe("Failed to initialize OpenAI agent", error);
       throw new PolarisError(
-        `OpenAI agent initialization failed: ${error}`,
+        `OpenAI agent initialization failed: ${error instanceof Error ? error.message : String(error)}`,
         "AGENT_INIT_FAILED",
-        { agentId: this.id, config: this.config }
+        { agentId: this.id }
       );
     }
   }
@@ -167,7 +167,7 @@ export class OpenAIAgent extends BaseAgent {
           const retryDelay = retryAfterMs || baseDelays[attempt - 1] || 60000;
 
           this.logger.warn(
-            `Rate limit hit, retrying in ${retryDelay}ms (attempt ${attempt}/${maxRetries})`
+            `Rate limit exceeded, retrying in ${Math.round(retryDelay / 1000)}s (attempt ${attempt}/${maxRetries})`
           );
           if (retryAfterHeader) {
             this.logger.info(
@@ -179,7 +179,7 @@ export class OpenAIAgent extends BaseAgent {
           continue;
         }
 
-        this.logger.error(
+        this.logger.errorSafe(
           `OpenAI evaluation failed (attempt ${attempt}/${maxRetries})`,
           error
         );
@@ -196,7 +196,7 @@ export class OpenAIAgent extends BaseAgent {
       agentId: this.id,
       score: 0.5, // Neutral score
       confidence: 0.1, // Low confidence
-      reasoning: `Evaluation failed after ${maxRetries} attempts: ${lastError}`,
+      reasoning: `Evaluation failed: ${lastError instanceof Error ? lastError.message : "API rate limit exceeded"}`,
       metadata: {
         error: true,
         errorMessage: String(lastError),
@@ -280,7 +280,7 @@ export class OpenAIAgent extends BaseAgent {
 
       return response.data;
     } catch (error) {
-      this.logger.error("Simplified API call failed", error);
+      this.logger.errorSafe("Simplified API call failed", error);
       throw error;
     }
   }
