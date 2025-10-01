@@ -10,7 +10,8 @@ import { WebAPIConfig } from "../base/parameters";
 import { Logger } from "../../utils/logger";
 import { EnvironmentConfig } from "../../utils/config";
 import { PolarisError } from "../../errors/base";
-import axios, { AxiosInstance } from "axios";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { GenerativeModel } from "@google/generative-ai";
 
 /**
  * Google-specific configuration
@@ -23,36 +24,12 @@ export interface GoogleConfig extends WebAPIConfig {
 }
 
 /**
- * Google Gemini API response structure
- */
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{
-        text: string;
-      }>;
-      role: string;
-    };
-    finishReason: string;
-    index: number;
-    safetyRatings: Array<{
-      category: string;
-      probability: string;
-    }>;
-  }>;
-  usageMetadata: {
-    promptTokenCount: number;
-    candidatesTokenCount: number;
-    totalTokenCount: number;
-  };
-}
-
-/**
  * Google Gemini Agent for game state evaluation
  */
 export class GoogleAgent extends BaseAgent {
   private config: GoogleConfig;
-  private httpClient: AxiosInstance;
+  private client: GoogleGenerativeAI;
+  private model: GenerativeModel;
   private systemPrompt: string;
   private logger: Logger;
 
@@ -77,20 +54,23 @@ export class GoogleAgent extends BaseAgent {
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
 
-    // Initialize HTTP client
-    this.httpClient = axios.create({
-      baseURL:
-        EnvironmentConfig.GOOGLE.baseURL ||
-        "https://generativelanguage.googleapis.com",
-      headers: {
-        "Content-Type": "application/json",
-        "X-goog-api-key": this.config.apiKey,
-      },
-      timeout: EnvironmentConfig.GOOGLE.timeout || 30000,
-    });
-
     this.systemPrompt =
       this.config.systemPrompt || this.getDefaultSystemPrompt();
+
+    // Initialize Google Generative AI client
+    this.client = new GoogleGenerativeAI(this.config.apiKey);
+    this.model = this.client.getGenerativeModel({
+      model: this.config.model,
+      generationConfig: {
+        ...(this.config.temperature !== undefined && {
+          temperature: this.config.temperature,
+        }),
+        ...(this.config.maxTokens !== undefined && {
+          maxOutputTokens: this.config.maxTokens,
+        }),
+      },
+      systemInstruction: this.systemPrompt,
+    });
     this.logger = new Logger(
       `GoogleAgent-${this.id}`,
       EnvironmentConfig.POLARIS.logLevel
@@ -134,26 +114,8 @@ export class GoogleAgent extends BaseAgent {
       const prompt = this.buildEvaluationPrompt(gameState);
 
       // Make API call to Google Gemini
-      const response = await this.httpClient.post(
-        `/v1beta/models/${this.config.model}:generateContent`,
-        {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `${this.systemPrompt}\n\n${prompt}`,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: this.config.temperature,
-            maxOutputTokens: this.config.maxTokens,
-          },
-        }
-      );
-
-      const geminiResponse: GeminiResponse = response.data;
+      const result = await this.model.generateContent(prompt);
+      const geminiResponse = result.response;
       const evaluation = this.parseEvaluationResponse(geminiResponse);
 
       // Update statistics
@@ -165,7 +127,7 @@ export class GoogleAgent extends BaseAgent {
         gameStateId: gameState.id,
         evaluationTime,
         confidence: evaluation.confidence,
-        tokensUsed: geminiResponse.usageMetadata.totalTokenCount,
+        tokensUsed: geminiResponse.usageMetadata?.totalTokenCount || 0,
       });
 
       return evaluation;
@@ -173,15 +135,36 @@ export class GoogleAgent extends BaseAgent {
       this.statistics.errorCount++;
       this.logger.errorSafe("Google evaluation failed", error);
 
+      let errorMessage = String(error);
+      let errorMetadata: any = { error: true };
+
+      if (error instanceof Error) {
+        errorMessage = `Google API Error: ${error.message}`;
+        // Check for specific Google API error patterns
+        if (error.message.includes("API key")) {
+          errorMetadata.authError = true;
+        } else if (
+          error.message.includes("quota") ||
+          error.message.includes("rate")
+        ) {
+          errorMetadata.rateLimited = true;
+        } else if (
+          error.message.includes("network") ||
+          error.message.includes("connection")
+        ) {
+          errorMetadata.connectionError = true;
+        }
+      }
+
       // Return a default evaluation on error
       return {
         agentId: this.id,
         score: 0.5, // Neutral score
         confidence: 0.1, // Low confidence
-        reasoning: `Evaluation failed: ${error}`,
+        reasoning: `Evaluation failed: ${errorMessage}`,
         metadata: {
-          error: true,
-          errorMessage: String(error),
+          ...errorMetadata,
+          errorMessage,
           evaluationTime: performance.now() - startTime,
         },
       };
@@ -216,35 +199,26 @@ export class GoogleAgent extends BaseAgent {
   private async testConnection(): Promise<void> {
     try {
       // Test with a simple generation request
-      const response = await this.httpClient.post(
-        `/v1beta/models/${this.config.model}:generateContent`,
-        {
-          contents: [
-            {
-              parts: [
-                {
-                  text: 'Hello, respond with just "OK"',
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 10,
-          },
-        }
+      const result = await this.model.generateContent(
+        'Hello, respond with just "OK"'
       );
-
-      if (response.status !== 200) {
-        throw new Error(`API test failed with status: ${response.status}`);
-      }
+      const response = result.response;
 
       // Check if we have a valid response
-      const candidates = response.data?.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error("No candidates in response");
+      if (!response.text()) {
+        throw new Error("No text content in response");
       }
     } catch (error) {
-      throw new Error(`Google API connection test failed: ${error}`);
+      if (error instanceof Error) {
+        throw new PolarisError(
+          `Google API connection test failed: ${error.message}`,
+          "GOOGLE_API_ERROR"
+        );
+      }
+      throw new PolarisError(
+        `Google API connection test failed: ${error}`,
+        "GOOGLE_CONNECTION_ERROR"
+      );
     }
   }
 
@@ -282,14 +256,12 @@ Provide your response as valid JSON only.
 `;
   }
 
-  private parseEvaluationResponse(response: GeminiResponse): EvaluationResult {
+  private parseEvaluationResponse(response: any): EvaluationResult {
     try {
-      const candidate = response.candidates[0];
-      if (!candidate || !candidate.content.parts[0]?.text) {
+      let content = response.text();
+      if (!content) {
         throw new Error("No response content received");
       }
-
-      let content = candidate.content.parts[0].text;
 
       // Handle markdown-wrapped JSON responses
       if (content.includes("```json")) {
@@ -317,9 +289,10 @@ Provide your response as valid JSON only.
           tacticalThemes: parsed.tacticalThemes || [],
           positionType: parsed.positionType || "unknown",
           riskAssessment: parsed.riskAssessment || "medium",
-          tokensUsed: response.usageMetadata.totalTokenCount,
+          tokensUsed: response.usageMetadata?.totalTokenCount || 0,
           model: this.config.model,
-          finishReason: candidate.finishReason,
+          finishReason: response.candidates?.[0]?.finishReason,
+          safetyRatings: response.candidates?.[0]?.safetyRatings,
         },
       };
     } catch (error) {
@@ -335,7 +308,7 @@ Provide your response as valid JSON only.
         reasoning: `Failed to parse response: ${error}`,
         metadata: {
           parseError: true,
-          rawResponse: response.candidates[0]?.content.parts[0]?.text,
+          rawResponse: response.text(),
         },
       };
     }

@@ -13,11 +13,9 @@ dotenv.config();
  */
 export interface APIConfig {
   apiKey: string;
-  baseURL?: string;
   timeout?: number;
-  rateLimitPerMinute?: number;
   maxRetries?: number;
-  retryDelay?: number;
+  organizationId?: string; // For OpenAI
 }
 
 /**
@@ -27,43 +25,30 @@ export class EnvironmentConfig {
   // OpenAI Configuration
   static readonly OPENAI: APIConfig = {
     apiKey: process.env.OPENAI_API_KEY || "",
-    baseURL: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-    timeout: parseInt(process.env.API_TIMEOUT || "30000"),
-    rateLimitPerMinute: parseInt(process.env.OPENAI_RATE_LIMIT || "60"),
-    maxRetries: parseInt(process.env.RETRY_ATTEMPTS || "3"),
-    retryDelay: parseInt(process.env.RETRY_DELAY || "1000"),
+    organizationId: process.env.OPENAI_ORGANIZATION_ID || "",
+    timeout: parseInt(process.env.OPENAI_TIMEOUT || "30000"),
+    maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || "3"),
   };
 
   // Anthropic Configuration
   static readonly ANTHROPIC: APIConfig = {
     apiKey: process.env.ANTHROPIC_API_KEY || "",
-    baseURL: process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
-    timeout: parseInt(process.env.API_TIMEOUT || "30000"),
-    rateLimitPerMinute: parseInt(process.env.ANTHROPIC_RATE_LIMIT || "50"),
-    maxRetries: parseInt(process.env.RETRY_ATTEMPTS || "3"),
-    retryDelay: parseInt(process.env.RETRY_DELAY || "1000"),
+    timeout: parseInt(process.env.ANTHROPIC_TIMEOUT || "30000"),
+    maxRetries: parseInt(process.env.ANTHROPIC_MAX_RETRIES || "3"),
   };
 
   // Google Configuration
   static readonly GOOGLE: APIConfig = {
     apiKey: process.env.GOOGLE_API_KEY || "",
-    baseURL:
-      process.env.GOOGLE_BASE_URL ||
-      "https://generativelanguage.googleapis.com",
-    timeout: parseInt(process.env.API_TIMEOUT || "30000"),
-    rateLimitPerMinute: parseInt(process.env.GOOGLE_RATE_LIMIT || "60"),
-    maxRetries: parseInt(process.env.RETRY_ATTEMPTS || "3"),
-    retryDelay: parseInt(process.env.RETRY_DELAY || "1000"),
+    timeout: parseInt(process.env.GOOGLE_TIMEOUT || "30000"),
+    maxRetries: parseInt(process.env.GOOGLE_MAX_RETRIES || "3"),
   };
 
   // Ollama Configuration (for local models)
   static readonly OLLAMA: APIConfig = {
     apiKey: "", // Ollama doesn't require API key
-    baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-    timeout: parseInt(process.env.API_TIMEOUT || "60000"), // Longer timeout for local models
-    rateLimitPerMinute: parseInt(process.env.OLLAMA_RATE_LIMIT || "1000"),
-    maxRetries: parseInt(process.env.RETRY_ATTEMPTS || "3"),
-    retryDelay: parseInt(process.env.RETRY_DELAY || "1000"),
+    timeout: parseInt(process.env.OLLAMA_TIMEOUT || "60000"), // Longer timeout for local models
+    maxRetries: parseInt(process.env.OLLAMA_MAX_RETRIES || "3"),
   };
 
   // POLARIS Framework Configuration

@@ -10,7 +10,8 @@ import { WebAPIConfig } from "../base/parameters";
 import { Logger } from "../../utils/logger";
 import { EnvironmentConfig } from "../../utils/config";
 import { PolarisError } from "../../errors/base";
-import axios, { AxiosInstance } from "axios";
+import Anthropic from "@anthropic-ai/sdk";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
 /**
  * Anthropic-specific configuration
@@ -22,29 +23,11 @@ export interface AnthropicConfig extends WebAPIConfig {
 }
 
 /**
- * Anthropic API response structure
- */
-interface AnthropicResponse {
-  content: Array<{
-    type: string;
-    text: string;
-  }>;
-  role: string;
-  model: string;
-  stop_reason: string;
-  stop_sequence: string | null;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-  };
-}
-
-/**
  * Anthropic Claude Agent for game state evaluation
  */
 export class AnthropicAgent extends BaseAgent {
   private config: AnthropicConfig;
-  private httpClient: AxiosInstance;
+  private client: Anthropic;
   private systemPrompt: string;
   private logger: Logger;
 
@@ -62,22 +45,17 @@ export class AnthropicAgent extends BaseAgent {
       id: agentId,
       name: config.name || "Claude-3",
       provider: "anthropic",
-      apiKey: config.apiKey || EnvironmentConfig.ANTHROPIC.apiKey,
+
       model: config.model || "claude-3-haiku-20240307",
       maxTokens: config.maxTokens || 1000,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
 
-    // Initialize HTTP client
-    this.httpClient = axios.create({
-      baseURL:
-        EnvironmentConfig.ANTHROPIC.baseURL || "https://api.anthropic.com",
-      headers: {
-        "x-api-key": this.config.apiKey,
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-      },
+    // Initialize Anthropic client
+    this.client = new Anthropic({
+      apiKey: this.config.apiKey,
       timeout: EnvironmentConfig.ANTHROPIC.timeout || 30000,
+      maxRetries: EnvironmentConfig.ANTHROPIC.maxRetries || 3,
     });
 
     this.systemPrompt =
@@ -124,19 +102,19 @@ export class AnthropicAgent extends BaseAgent {
       const prompt = this.buildEvaluationPrompt(gameState);
 
       // Make API call to Anthropic
-      const response = await this.httpClient.post("/v1/messages", {
+      const messages: MessageParam[] = [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
+
+      const anthropicResponse = await this.client.messages.create({
         model: this.config.model,
         max_tokens: this.config.maxTokens,
         system: this.systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        messages,
       });
-
-      const anthropicResponse: AnthropicResponse = response.data;
       const evaluation = this.parseEvaluationResponse(anthropicResponse);
 
       // Update statistics
@@ -158,15 +136,32 @@ export class AnthropicAgent extends BaseAgent {
       this.statistics.errorCount++;
       this.logger.errorSafe("Anthropic evaluation failed", error);
 
+      let errorMessage = String(error);
+      let errorMetadata: any = { error: true };
+
+      if (error instanceof Anthropic.APIError) {
+        errorMessage = `Anthropic API Error: ${error.message}`;
+        errorMetadata = {
+          ...errorMetadata,
+          status: error.status,
+        };
+      } else if (error instanceof Anthropic.APIConnectionError) {
+        errorMessage = `Anthropic Connection Error: ${error.message}`;
+        errorMetadata.connectionError = true;
+      } else if (error instanceof Anthropic.RateLimitError) {
+        errorMessage = `Anthropic Rate Limit Error: ${error.message}`;
+        errorMetadata.rateLimited = true;
+      }
+
       // Return a default evaluation on error
       return {
         agentId: this.id,
         score: 0.5, // Neutral score
         confidence: 0.1, // Low confidence
-        reasoning: `Evaluation failed: ${error}`,
+        reasoning: `Evaluation failed: ${errorMessage}`,
         metadata: {
-          error: true,
-          errorMessage: String(error),
+          ...errorMetadata,
+          errorMessage,
           evaluationTime: performance.now() - startTime,
         },
       };
@@ -201,7 +196,7 @@ export class AnthropicAgent extends BaseAgent {
   private async testConnection(): Promise<void> {
     try {
       // Anthropic doesn't have a simple models endpoint, so we make a minimal request
-      const response = await this.httpClient.post("/v1/messages", {
+      await this.client.messages.create({
         model: this.config.model,
         max_tokens: 10,
         messages: [
@@ -211,12 +206,18 @@ export class AnthropicAgent extends BaseAgent {
           },
         ],
       });
-
-      if (response.status !== 200) {
-        throw new Error(`API test failed with status: ${response.status}`);
-      }
     } catch (error) {
-      throw new Error(`Anthropic API connection test failed: ${error}`);
+      if (error instanceof Anthropic.APIError) {
+        throw new PolarisError(
+          `Anthropic API connection test failed: ${error.message}`,
+          "ANTHROPIC_API_ERROR",
+          { status: error.status }
+        );
+      }
+      throw new PolarisError(
+        `Anthropic API connection test failed: ${error}`,
+        "ANTHROPIC_CONNECTION_ERROR"
+      );
     }
   }
 
@@ -255,10 +256,13 @@ Provide your response as valid JSON only.
   }
 
   private parseEvaluationResponse(
-    response: AnthropicResponse
+    response: Anthropic.Messages.Message
   ): EvaluationResult {
     try {
-      const content = response.content[0]?.text;
+      const textBlock = response.content.find(
+        (block): block is Anthropic.TextBlock => block.type === "text"
+      );
+      const content = textBlock?.text;
       if (!content) {
         throw new Error("No response content received");
       }
@@ -277,7 +281,8 @@ Provide your response as valid JSON only.
           positionType: parsed.positionType || "unknown",
           riskAssessment: parsed.riskAssessment || "medium",
           tokensUsed:
-            response.usage.input_tokens + response.usage.output_tokens,
+            (response.usage.input_tokens || 0) +
+            (response.usage.output_tokens || 0),
           model: this.config.model,
         },
       };
@@ -294,7 +299,9 @@ Provide your response as valid JSON only.
         reasoning: `Failed to parse response: ${error}`,
         metadata: {
           parseError: true,
-          rawResponse: response.content[0]?.text,
+          rawResponse: response.content.find(
+            (block): block is Anthropic.TextBlock => block.type === "text"
+          )?.text,
         },
       };
     }

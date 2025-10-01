@@ -11,7 +11,8 @@ import { Logger } from "../../utils/logger";
 import { EnvironmentConfig } from "../../utils/config";
 
 import { PolarisError } from "../../errors/base";
-import axios, { AxiosInstance } from "axios";
+import OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 /**
  * OpenAI-specific configuration
@@ -24,34 +25,11 @@ export interface OpenAIConfig extends WebAPIConfig {
 }
 
 /**
- * OpenAI API response structure
- */
-interface OpenAIResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-/**
  * OpenAI GPT Agent for game state evaluation
  */
 export class OpenAIAgent extends BaseAgent {
   private config: OpenAIConfig;
-  private httpClient: AxiosInstance;
+  private client: OpenAI;
   private systemPrompt: string;
   private logger: Logger;
 
@@ -76,14 +54,12 @@ export class OpenAIAgent extends BaseAgent {
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
 
-    // Initialize HTTP client
-    this.httpClient = axios.create({
-      baseURL: EnvironmentConfig.OPENAI.baseURL || "https://api.openai.com/v1",
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-      },
+    // Initialize OpenAI client
+    this.client = new OpenAI({
+      apiKey: this.config.apiKey,
+      organization: this.config.organizationId || EnvironmentConfig.OPENAI.organizationId,
       timeout: EnvironmentConfig.OPENAI.timeout || 30000,
+      maxRetries: EnvironmentConfig.OPENAI.maxRetries || 3,
     });
 
     this.systemPrompt =
@@ -131,23 +107,29 @@ export class OpenAIAgent extends BaseAgent {
       const prompt = this.buildEvaluationPrompt(gameState);
 
       // Make API call to OpenAI
-      const response = await this.httpClient.post("/chat/completions", {
+      const messages: ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: this.systemPrompt,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
+
+      const requestParams: any = {
         model: this.config.model,
         max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature,
-        messages: [
-          {
-            role: "system",
-            content: this.systemPrompt,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      });
+        messages,
+      };
 
-      const openAIResponse: OpenAIResponse = response.data;
+      if (this.config.temperature !== undefined) {
+        requestParams.temperature = this.config.temperature;
+      }
+
+      const openAIResponse =
+        await this.client.chat.completions.create(requestParams);
       const evaluation = this.parseEvaluationResponse(openAIResponse);
 
       // Update statistics
@@ -159,7 +141,7 @@ export class OpenAIAgent extends BaseAgent {
         gameStateId: gameState.id,
         evaluationTime,
         confidence: evaluation.confidence,
-        tokensUsed: openAIResponse.usage.total_tokens,
+        tokensUsed: openAIResponse.usage?.total_tokens || 0,
       });
 
       return evaluation;
@@ -167,15 +149,34 @@ export class OpenAIAgent extends BaseAgent {
       this.statistics.errorCount++;
       this.logger.errorSafe("OpenAI evaluation failed", error);
 
+      let errorMessage = String(error);
+      let errorMetadata: any = { error: true };
+
+      if (error instanceof OpenAI.APIError) {
+        errorMessage = `OpenAI API Error: ${error.message}`;
+        errorMetadata = {
+          ...errorMetadata,
+          status: error.status,
+          type: error.type,
+          code: error.code,
+        };
+      } else if (error instanceof OpenAI.APIConnectionError) {
+        errorMessage = `OpenAI Connection Error: ${error.message}`;
+        errorMetadata.connectionError = true;
+      } else if (error instanceof OpenAI.RateLimitError) {
+        errorMessage = `OpenAI Rate Limit Error: ${error.message}`;
+        errorMetadata.rateLimited = true;
+      }
+
       // Return a default evaluation on error
       return {
         agentId: this.id,
         score: 0.5, // Neutral score
         confidence: 0.1, // Low confidence
-        reasoning: `Evaluation failed: ${error}`,
+        reasoning: `Evaluation failed: ${errorMessage}`,
         metadata: {
-          error: true,
-          errorMessage: String(error),
+          ...errorMetadata,
+          errorMessage,
           evaluationTime: performance.now() - startTime,
         },
       };
@@ -210,13 +211,19 @@ export class OpenAIAgent extends BaseAgent {
   private async testConnection(): Promise<void> {
     try {
       // Test connection with models endpoint
-      const response = await this.httpClient.get("/models");
-
-      if (response.status !== 200) {
-        throw new Error(`API test failed with status: ${response.status}`);
-      }
+      await this.client.models.list();
     } catch (error) {
-      throw new Error(`OpenAI API connection test failed: ${error}`);
+      if (error instanceof OpenAI.APIError) {
+        throw new PolarisError(
+          `OpenAI API connection test failed: ${error.message}`,
+          "OPENAI_API_ERROR",
+          { status: error.status, type: error.type }
+        );
+      }
+      throw new PolarisError(
+        `OpenAI API connection test failed: ${error}`,
+        "OPENAI_CONNECTION_ERROR"
+      );
     }
   }
 
@@ -254,7 +261,9 @@ Provide your response as valid JSON only.
 `;
   }
 
-  private parseEvaluationResponse(response: OpenAIResponse): EvaluationResult {
+  private parseEvaluationResponse(
+    response: OpenAI.Chat.Completions.ChatCompletion
+  ): EvaluationResult {
     try {
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -274,7 +283,7 @@ Provide your response as valid JSON only.
           tacticalThemes: parsed.tacticalThemes || [],
           positionType: parsed.positionType || "unknown",
           riskAssessment: parsed.riskAssessment || "medium",
-          tokensUsed: response.usage.total_tokens,
+          tokensUsed: response.usage?.total_tokens || 0,
           model: this.config.model,
         },
       };
