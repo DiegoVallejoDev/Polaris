@@ -279,7 +279,10 @@ Provide your response as valid JSON only.
         },
       };
     } catch (error) {
-      this.logger.warn("Failed to parse OpenAI response, using fallback", error);
+      this.logger.warn(
+        "Failed to parse OpenAI response, using fallback",
+        error
+      );
 
       return {
         agentId: this.id,
