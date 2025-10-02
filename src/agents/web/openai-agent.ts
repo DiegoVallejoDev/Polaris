@@ -14,6 +14,9 @@ import { PolarisError } from "../../errors/base";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
+export const DEFAULT_OPENAI_NAME = "GPT-4o";
+export const DEFAULT_OPENAI_MODEL = "gpt-4o";
+
 /**
  * OpenAI-specific configuration
  */
@@ -37,7 +40,7 @@ export class OpenAIAgent extends BaseAgent {
     // Generate ID if not provided
     const agentId = config.id || BaseAgent.generateAgentId("OpenAI");
 
-    super(agentId, config.name || "GPT-4", "WebAPI", {
+    super(agentId, config.name || DEFAULT_OPENAI_NAME, "WebAPI", {
       ...config,
       provider: "openai",
     });
@@ -45,10 +48,10 @@ export class OpenAIAgent extends BaseAgent {
     this.config = {
       ...config,
       id: agentId,
-      name: config.name || "GPT-4",
+      name: config.name || DEFAULT_OPENAI_NAME,
       provider: "openai",
       apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-      model: config.model || "gpt-4",
+      model: config.model || DEFAULT_OPENAI_MODEL,
       maxTokens: config.maxTokens || 1000,
       temperature: config.temperature || 0.7,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
@@ -57,7 +60,8 @@ export class OpenAIAgent extends BaseAgent {
     // Initialize OpenAI client
     this.client = new OpenAI({
       apiKey: this.config.apiKey,
-      organization: this.config.organizationId || EnvironmentConfig.OPENAI.organizationId,
+      organization:
+        this.config.organizationId || EnvironmentConfig.OPENAI.organizationId,
       timeout: EnvironmentConfig.OPENAI.timeout || 30000,
       maxRetries: EnvironmentConfig.OPENAI.maxRetries || 3,
     });
@@ -265,9 +269,23 @@ Provide your response as valid JSON only.
     response: OpenAI.Chat.Completions.ChatCompletion
   ): EvaluationResult {
     try {
-      const content = response.choices[0]?.message?.content;
+      let content = response.choices[0]?.message?.content;
       if (!content) {
         throw new Error("No response content received");
+      }
+
+      // Sanitize the response to remove markdown code blocks
+      const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+      const match = content.match(jsonRegex);
+      if (match && match[1]) {
+        content = match[1];
+      } else {
+        // Fallback for cases where the ```json marker is missing but it's still wrapped
+        const codeBlockRegex = /```\s*([\s\S]*?)\s*```/;
+        const codeMatch = content.match(codeBlockRegex);
+        if (codeMatch && codeMatch[1]) {
+          content = codeMatch[1];
+        }
       }
 
       const parsed = JSON.parse(content);

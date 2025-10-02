@@ -13,6 +13,9 @@ import { PolarisError } from "../../errors/base";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
+export const DEFAULT_ANTHROPIC_NAME = "Claude-3.5 Sonnet";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-sonnet-20250219";
+
 /**
  * Anthropic-specific configuration
  */
@@ -35,7 +38,7 @@ export class AnthropicAgent extends BaseAgent {
     // Generate ID if not provided
     const agentId = config.id || BaseAgent.generateAgentId("Anthropic");
 
-    super(agentId, config.name || "Claude-3", "WebAPI", {
+    super(agentId, config.name || DEFAULT_ANTHROPIC_NAME, "WebAPI", {
       ...config,
       provider: "anthropic",
     });
@@ -43,10 +46,10 @@ export class AnthropicAgent extends BaseAgent {
     this.config = {
       ...config,
       id: agentId,
-      name: config.name || "Claude-3",
+      name: config.name || DEFAULT_ANTHROPIC_NAME,
       provider: "anthropic",
 
-      model: config.model || "claude-3-haiku-20240307",
+      model: config.model || DEFAULT_ANTHROPIC_MODEL,
       maxTokens: config.maxTokens || 1000,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
@@ -73,10 +76,19 @@ export class AnthropicAgent extends BaseAgent {
 
   override async initialize(): Promise<void> {
     try {
-      // Test API connection
-      await this.testConnection();
+      // Test API connection (non-blocking)
+      try {
+        await this.testConnection();
+        this.logger.info("Anthropic agent initialized successfully");
+      } catch (testError) {
+        // Log warning but continue initialization
+        this.logger.warn(
+          "Anthropic API connection test failed (agent will retry on first use)",
+          testError
+        );
+      }
+
       this.ready = true;
-      this.logger.info("Anthropic agent initialized successfully");
       await super.initialize();
     } catch (error) {
       this.logger.errorSafe("Failed to initialize Anthropic agent", error);
@@ -196,13 +208,14 @@ export class AnthropicAgent extends BaseAgent {
   private async testConnection(): Promise<void> {
     try {
       // Anthropic doesn't have a simple models endpoint, so we make a minimal request
+      // Using max_tokens: 1 to minimize cost and time
       await this.client.messages.create({
         model: this.config.model,
-        max_tokens: 10,
+        max_tokens: 1,
         messages: [
           {
             role: "user",
-            content: "Hello",
+            content: "test",
           },
         ],
       });
@@ -215,7 +228,7 @@ export class AnthropicAgent extends BaseAgent {
         );
       }
       throw new PolarisError(
-        `Anthropic API connection test failed: ${error}`,
+        `Anthropic API connection test failed: ${error instanceof Error ? error.message : String(error)}`,
         "ANTHROPIC_CONNECTION_ERROR"
       );
     }
@@ -258,16 +271,18 @@ Provide your response as valid JSON only.
   private parseEvaluationResponse(
     response: Anthropic.Messages.Message
   ): EvaluationResult {
+    const textBlock = response.content.find(
+      (block): block is Anthropic.TextBlock => block.type === "text"
+    );
+    const rawContent = textBlock?.text || "";
+
     try {
-      const textBlock = response.content.find(
-        (block): block is Anthropic.TextBlock => block.type === "text"
-      );
-      const content = textBlock?.text;
-      if (!content) {
+      if (!rawContent) {
         throw new Error("No response content received");
       }
 
-      const parsed = JSON.parse(content);
+      const normalizedContent = this.extractJsonPayload(rawContent);
+      const parsed = JSON.parse(normalizedContent);
 
       return {
         agentId: this.id,
@@ -299,12 +314,29 @@ Provide your response as valid JSON only.
         reasoning: `Failed to parse response: ${error}`,
         metadata: {
           parseError: true,
-          rawResponse: response.content.find(
-            (block): block is Anthropic.TextBlock => block.type === "text"
-          )?.text,
+          rawResponse: rawContent || undefined,
         },
       };
     }
+  }
+
+  private extractJsonPayload(content: string): string {
+    const trimmed = content.trim();
+
+    // Prefer content inside JSON code fences when present
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedMatch && fencedMatch[1]) {
+      return fencedMatch[1].trim();
+    }
+
+    // Fall back to extracting the first JSON object found in the text
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return trimmed.slice(firstBrace, lastBrace + 1).trim();
+    }
+
+    return trimmed;
   }
 
   private validateScore(score: any): number {

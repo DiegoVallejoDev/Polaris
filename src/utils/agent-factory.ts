@@ -10,6 +10,18 @@ import { ConfigurationError, AgentError } from "../errors/base";
 import { Validator } from "./validation";
 import { Logger } from "./logger";
 import { EnhancedEnvironmentConfig } from "./enhanced-config";
+import {
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENAI_NAME,
+} from "../agents/web/openai-agent";
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_ANTHROPIC_NAME,
+} from "../agents/web/anthropic-agent";
+import {
+  DEFAULT_GOOGLE_MODEL,
+  DEFAULT_GOOGLE_NAME,
+} from "../agents/web/google-agent";
 
 /**
  * Agent type registry
@@ -250,13 +262,13 @@ export class OpenAIAgentFactory extends BaseAgentFactory {
       // Create agent configuration
       const agentConfig = {
         id: config.id || this.generateAgentId("openai", config.name),
-        name: config.name || "OpenAI-GPT",
+        name: config.name || DEFAULT_OPENAI_NAME,
         provider: "openai" as const,
         ...config.parameters,
         apiKey: apiConfig.apiKey,
         baseURL: apiConfig.baseURL,
         timeout: apiConfig.timeout,
-        model: config.parameters.model || "gpt-4o",
+        model: config.parameters.model || DEFAULT_OPENAI_MODEL,
         temperature: config.parameters.temperature || 0.7,
         maxTokens: config.parameters.maxTokens || 1000,
       };
@@ -293,7 +305,7 @@ export class OpenAIAgentFactory extends BaseAgentFactory {
       enabled: true,
       weight: 1.0,
       parameters: {
-        model: "gpt-4o",
+        model: DEFAULT_OPENAI_MODEL,
         temperature: 0.7,
         maxTokens: 1000,
       },
@@ -337,13 +349,13 @@ export class AnthropicAgentFactory extends BaseAgentFactory {
 
       const agentConfig = {
         id: config.id || this.generateAgentId("anthropic", config.name),
-        name: config.name || "Anthropic-Claude",
+        name: config.name || DEFAULT_ANTHROPIC_NAME,
         provider: "anthropic" as const,
         ...config.parameters,
         apiKey: apiConfig.apiKey,
         baseURL: apiConfig.baseURL,
         timeout: apiConfig.timeout,
-        model: config.parameters.model || "claude-3-haiku-20240307",
+        model: config.parameters.model || DEFAULT_ANTHROPIC_MODEL,
         temperature: config.parameters.temperature || 0.7,
         maxTokens: config.parameters.maxTokens || 1000,
       };
@@ -378,7 +390,7 @@ export class AnthropicAgentFactory extends BaseAgentFactory {
       enabled: true,
       weight: 1.0,
       parameters: {
-        model: "claude-3-haiku-20240307",
+        model: DEFAULT_ANTHROPIC_MODEL,
         temperature: 0.7,
         maxTokens: 1000,
       },
@@ -421,13 +433,13 @@ export class GoogleAgentFactory extends BaseAgentFactory {
 
       const agentConfig = {
         id: config.id || this.generateAgentId("google", config.name),
-        name: config.name || "Google-Gemini",
+        name: config.name || DEFAULT_GOOGLE_NAME,
         provider: "google" as const,
         ...config.parameters,
         apiKey: apiConfig.apiKey,
         baseURL: apiConfig.baseURL,
         timeout: apiConfig.timeout,
-        model: config.parameters.model || "gemini-1.5-flash",
+        model: config.parameters.model || DEFAULT_GOOGLE_MODEL,
         temperature: config.parameters.temperature || 0.7,
         maxTokens: config.parameters.maxTokens || 1000,
       };
@@ -462,7 +474,7 @@ export class GoogleAgentFactory extends BaseAgentFactory {
       enabled: true,
       weight: 1.0,
       parameters: {
-        model: "gemini-1.5-flash",
+        model: DEFAULT_GOOGLE_MODEL,
         temperature: 0.7,
         maxTokens: 1000,
       },

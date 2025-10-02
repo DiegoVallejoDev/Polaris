@@ -2,16 +2,46 @@
  * Web API Agents - Entry point for LLM-powered agents
  */
 
-export { OpenAIAgent, type OpenAIConfig } from "./openai-agent";
-export { AnthropicAgent, type AnthropicConfig } from "./anthropic-agent";
-export { GoogleAgent, type GoogleConfig } from "./google-agent";
+export {
+  OpenAIAgent,
+  type OpenAIConfig,
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENAI_NAME,
+} from "./openai-agent";
+export {
+  AnthropicAgent,
+  type AnthropicConfig,
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_ANTHROPIC_NAME,
+} from "./anthropic-agent";
+export {
+  GoogleAgent,
+  type GoogleConfig,
+  DEFAULT_GOOGLE_MODEL,
+  DEFAULT_GOOGLE_NAME,
+} from "./google-agent";
 
 /**
  * Agent factory for creating web API agents
  */
-import { OpenAIAgent, OpenAIConfig } from "./openai-agent";
-import { AnthropicAgent, AnthropicConfig } from "./anthropic-agent";
-import { GoogleAgent, GoogleConfig } from "./google-agent";
+import {
+  OpenAIAgent,
+  OpenAIConfig,
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENAI_NAME,
+} from "./openai-agent";
+import {
+  AnthropicAgent,
+  AnthropicConfig,
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_ANTHROPIC_NAME,
+} from "./anthropic-agent";
+import {
+  GoogleAgent,
+  GoogleConfig,
+  DEFAULT_GOOGLE_MODEL,
+  DEFAULT_GOOGLE_NAME,
+} from "./google-agent";
 import { Agent } from "../base/agent";
 import { EnvironmentConfig } from "../../utils/config";
 import { PolarisError } from "../../errors/base";
@@ -51,10 +81,10 @@ export class WebAgentFactory {
       case "openai":
         return new OpenAIAgent({
           id: config.id,
-          name: config.name || "OpenAI-GPT",
+          name: config.name || DEFAULT_OPENAI_NAME,
           provider: "openai",
           apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
-          model: config.model || "gpt-4o",
+          model: config.model || DEFAULT_OPENAI_MODEL,
           temperature: config.temperature || 0.7,
           maxTokens: config.maxTokens || 1000,
           systemPrompt: config.systemPrompt,
@@ -63,10 +93,10 @@ export class WebAgentFactory {
       case "anthropic":
         return new AnthropicAgent({
           id: config.id,
-          name: config.name || "Claude-3",
+          name: config.name || DEFAULT_ANTHROPIC_NAME,
           provider: "anthropic",
           apiKey: config.apiKey || EnvironmentConfig.ANTHROPIC.apiKey,
-          model: config.model || "claude-3-haiku-20240307",
+          model: config.model || DEFAULT_ANTHROPIC_MODEL,
           maxTokens: config.maxTokens || 1000,
           systemPrompt: config.systemPrompt,
         } as AnthropicConfig);
@@ -74,10 +104,10 @@ export class WebAgentFactory {
       case "google":
         return new GoogleAgent({
           id: config.id,
-          name: config.name || "Gemini-2.0-Flash",
+          name: config.name || DEFAULT_GOOGLE_NAME,
           provider: "google",
           apiKey: config.apiKey || EnvironmentConfig.GOOGLE.apiKey,
-          model: config.model || "gemini-2.0-flash",
+          model: config.model || DEFAULT_GOOGLE_MODEL,
           temperature: config.temperature || 0.7,
           maxTokens: config.maxTokens || 1000,
           systemPrompt: config.systemPrompt,
@@ -104,7 +134,7 @@ export class WebAgentFactory {
           this.createAgent({
             provider: "openai",
             name: "GPT-4o-Chess-Analyst",
-            model: "gpt-4o",
+            model: DEFAULT_OPENAI_MODEL,
           })
         );
       }
@@ -115,6 +145,7 @@ export class WebAgentFactory {
           this.createAgent({
             provider: "anthropic",
             name: "Claude-Chess-Expert",
+            model: DEFAULT_ANTHROPIC_MODEL,
           })
         );
       }
@@ -125,6 +156,7 @@ export class WebAgentFactory {
           this.createAgent({
             provider: "google",
             name: "Gemini-Chess-Advisor",
+            model: DEFAULT_GOOGLE_MODEL,
           })
         );
       }

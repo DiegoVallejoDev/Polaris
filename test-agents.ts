@@ -6,9 +6,21 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 import { EnvironmentConfig } from "./src/utils/config";
-import { OpenAIAgent } from "./src/agents/web/openai-agent";
-import { AnthropicAgent } from "./src/agents/web/anthropic-agent";
-import { GoogleAgent } from "./src/agents/web/google-agent";
+import {
+  OpenAIAgent,
+  DEFAULT_OPENAI_MODEL,
+  DEFAULT_OPENAI_NAME,
+} from "./src/agents/web/openai-agent";
+import {
+  AnthropicAgent,
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_ANTHROPIC_NAME,
+} from "./src/agents/web/anthropic-agent";
+import {
+  GoogleAgent,
+  DEFAULT_GOOGLE_MODEL,
+  DEFAULT_GOOGLE_NAME,
+} from "./src/agents/web/google-agent";
 
 class MockGameState {
   id = "test-position";
@@ -29,10 +41,10 @@ function createAgents() {
     agents.push(
       new AnthropicAgent({
         id: "anthropic",
-        name: "Claude",
+        name: DEFAULT_ANTHROPIC_NAME,
         provider: "anthropic" as const,
         apiKey: EnvironmentConfig.ANTHROPIC.apiKey,
-        model: "claude-3-haiku-20240307",
+        model: DEFAULT_ANTHROPIC_MODEL,
         maxTokens: 500,
       })
     );
@@ -42,10 +54,10 @@ function createAgents() {
     agents.push(
       new GoogleAgent({
         id: "google",
-        name: "Gemini",
+        name: DEFAULT_GOOGLE_NAME,
         provider: "google" as const,
         apiKey: EnvironmentConfig.GOOGLE.apiKey,
-        model: "gemini-2.0-flash",
+        model: DEFAULT_GOOGLE_MODEL,
         maxTokens: 500,
       })
     );
@@ -55,10 +67,10 @@ function createAgents() {
     agents.push(
       new OpenAIAgent({
         id: "openai",
-        name: "ChatGPT",
+        name: DEFAULT_OPENAI_NAME,
         provider: "openai" as const,
         apiKey: EnvironmentConfig.OPENAI.apiKey,
-        model: "gpt-3.5-turbo",
+        model: DEFAULT_OPENAI_MODEL,
         temperature: 0.7,
         maxTokens: 300,
       })

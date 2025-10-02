@@ -13,6 +13,9 @@ import { PolarisError } from "../../errors/base";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GenerativeModel } from "@google/generative-ai";
 
+export const DEFAULT_GOOGLE_NAME = "Gemini 1.5 Pro";
+export const DEFAULT_GOOGLE_MODEL = "gemini-1.5-pro";
+
 /**
  * Google-specific configuration
  */
@@ -37,7 +40,7 @@ export class GoogleAgent extends BaseAgent {
     // Generate ID if not provided
     const agentId = config.id || BaseAgent.generateAgentId("Google");
 
-    super(agentId, config.name || "Gemini-Pro", "WebAPI", {
+    super(agentId, config.name || DEFAULT_GOOGLE_NAME, "WebAPI", {
       ...config,
       provider: "google",
     });
@@ -45,10 +48,10 @@ export class GoogleAgent extends BaseAgent {
     this.config = {
       ...config,
       id: agentId,
-      name: config.name || "Gemini-Pro",
+      name: config.name || DEFAULT_GOOGLE_NAME,
       provider: "google",
       apiKey: config.apiKey || EnvironmentConfig.GOOGLE.apiKey,
-      model: config.model || "gemini-2.0-flash",
+      model: config.model || DEFAULT_GOOGLE_MODEL,
       maxTokens: config.maxTokens || 1000,
       temperature: config.temperature || 0.7,
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
@@ -85,10 +88,19 @@ export class GoogleAgent extends BaseAgent {
 
   override async initialize(): Promise<void> {
     try {
-      // Test API connection
-      await this.testConnection();
+      // Test API connection (non-blocking)
+      try {
+        await this.testConnection();
+        this.logger.info("Google agent initialized successfully");
+      } catch (testError) {
+        // Log warning but continue initialization
+        this.logger.warn(
+          "Google API connection test failed (agent will retry on first use)",
+          testError
+        );
+      }
+
       this.ready = true;
-      this.logger.info("Google agent initialized successfully");
       await super.initialize();
     } catch (error) {
       this.logger.errorSafe("Failed to initialize Google agent", error);
@@ -198,10 +210,13 @@ export class GoogleAgent extends BaseAgent {
 
   private async testConnection(): Promise<void> {
     try {
-      // Test with a simple generation request
-      const result = await this.model.generateContent(
-        'Hello, respond with just "OK"'
-      );
+      // Test with a minimal generation request (1 word response)
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: "Hi" }] }],
+        generationConfig: {
+          maxOutputTokens: 1,
+        },
+      });
       const response = result.response;
 
       // Check if we have a valid response
@@ -216,7 +231,7 @@ export class GoogleAgent extends BaseAgent {
         );
       }
       throw new PolarisError(
-        `Google API connection test failed: ${error}`,
+        `Google API connection test failed: ${String(error)}`,
         "GOOGLE_CONNECTION_ERROR"
       );
     }
@@ -257,26 +272,15 @@ Provide your response as valid JSON only.
   }
 
   private parseEvaluationResponse(response: any): EvaluationResult {
+    const content = this.extractTextContent(response);
+
     try {
-      let content = response.text();
       if (!content) {
         throw new Error("No response content received");
       }
 
-      // Handle markdown-wrapped JSON responses
-      if (content.includes("```json")) {
-        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          content = jsonMatch[1].trim();
-        }
-      } else if (content.includes("```")) {
-        const jsonMatch = content.match(/```\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          content = jsonMatch[1].trim();
-        }
-      }
-
-      const parsed = JSON.parse(content);
+      const normalizedContent = this.extractJsonPayload(content);
+      const parsed = JSON.parse(normalizedContent);
 
       return {
         agentId: this.id,
@@ -308,10 +312,59 @@ Provide your response as valid JSON only.
         reasoning: `Failed to parse response: ${error}`,
         metadata: {
           parseError: true,
-          rawResponse: response.text(),
+          rawResponse: content || response.text?.(),
         },
       };
     }
+  }
+
+  private extractTextContent(response: any): string {
+    try {
+      if (typeof response?.text === "function") {
+        const text = response.text();
+        if (text) {
+          return String(text).trim();
+        }
+      }
+    } catch (error) {
+      this.logger.debug("Failed to read response.text()", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    const candidates: any[] = response?.candidates ?? [];
+    const parts: string[] = [];
+
+    for (const candidate of candidates) {
+      const candidateParts =
+        candidate?.content?.parts ?? candidate?.parts ?? [];
+      for (const part of candidateParts) {
+        if (typeof part?.text === "string") {
+          parts.push(part.text);
+        } else if (typeof part === "string") {
+          parts.push(part);
+        }
+      }
+    }
+
+    return parts.join("\n").trim();
+  }
+
+  private extractJsonPayload(content: string): string {
+    const trimmed = content.trim();
+
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedMatch && fencedMatch[1]) {
+      return fencedMatch[1].trim();
+    }
+
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return trimmed.slice(firstBrace, lastBrace + 1).trim();
+    }
+
+    return trimmed;
   }
 
   private validateScore(score: any): number {
