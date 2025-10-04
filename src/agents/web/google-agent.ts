@@ -10,11 +10,10 @@ import { WebAPIConfig } from "../base/parameters";
 import { Logger } from "../../utils/logger";
 import { EnvironmentConfig } from "../../utils/config";
 import { PolarisError } from "../../errors/base";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-export const DEFAULT_GOOGLE_NAME = "Gemini 1.5 Pro";
-export const DEFAULT_GOOGLE_MODEL = "gemini-1.5-pro";
+export const DEFAULT_GOOGLE_NAME = "Gemini 2.5 pro";
+export const DEFAULT_GOOGLE_MODEL = "gemini-2.5-pro";
 
 /**
  * Google-specific configuration
@@ -31,8 +30,7 @@ export interface GoogleConfig extends WebAPIConfig {
  */
 export class GoogleAgent extends BaseAgent {
   private config: GoogleConfig;
-  private client: GoogleGenerativeAI;
-  private model: GenerativeModel;
+  private client: GoogleGenAI;
   private systemPrompt: string;
   private logger: Logger;
 
@@ -57,23 +55,10 @@ export class GoogleAgent extends BaseAgent {
       systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
 
+    // Initialize Google GenAI client
+    this.client = new GoogleGenAI({ apiKey: this.config.apiKey });
     this.systemPrompt =
       this.config.systemPrompt || this.getDefaultSystemPrompt();
-
-    // Initialize Google Generative AI client
-    this.client = new GoogleGenerativeAI(this.config.apiKey);
-    this.model = this.client.getGenerativeModel({
-      model: this.config.model,
-      generationConfig: {
-        ...(this.config.temperature !== undefined && {
-          temperature: this.config.temperature,
-        }),
-        ...(this.config.maxTokens !== undefined && {
-          maxOutputTokens: this.config.maxTokens,
-        }),
-      },
-      systemInstruction: this.systemPrompt,
-    });
     this.logger = new Logger(
       `GoogleAgent-${this.id}`,
       EnvironmentConfig.POLARIS.logLevel
@@ -123,11 +108,33 @@ export class GoogleAgent extends BaseAgent {
       this.statistics.totalEvaluations++;
 
       // Prepare the evaluation prompt
-      const prompt = this.buildEvaluationPrompt(gameState);
+      const userPrompt = this.buildEvaluationPrompt(gameState);
 
       // Make API call to Google Gemini
-      const result = await this.model.generateContent(prompt);
-      const geminiResponse = result.response;
+      const geminiResponse = await this.client.models.generateContent({
+        model: this.config.model,
+        contents: [
+          {
+            role: "system",
+            parts: [{ text: this.systemPrompt }],
+          },
+          {
+            role: "user",
+            parts: [{ text: userPrompt }],
+          },
+        ],
+        config: {
+          ...(this.config.temperature !== undefined && {
+            temperature: this.config.temperature,
+          }),
+          ...(this.config.maxTokens !== undefined && {
+            maxOutputTokens: this.config.maxTokens,
+          }),
+        },
+      });
+
+      this.logger.debug("Google API response received", geminiResponse);
+
       const evaluation = this.parseEvaluationResponse(geminiResponse);
 
       // Update statistics
@@ -139,7 +146,7 @@ export class GoogleAgent extends BaseAgent {
         gameStateId: gameState.id,
         evaluationTime,
         confidence: evaluation.confidence,
-        tokensUsed: geminiResponse.usageMetadata?.totalTokenCount || 0,
+        tokensUsed: (geminiResponse as any).usage?.totalTokens || 0,
       });
 
       return evaluation;
@@ -210,19 +217,14 @@ export class GoogleAgent extends BaseAgent {
 
   private async testConnection(): Promise<void> {
     try {
-      // Test with a minimal generation request (1 word response)
-      const result = await this.model.generateContent({
-        contents: [{ role: "user", parts: [{ text: "Hi" }] }],
-        generationConfig: {
+      // Test with a minimal generation request
+      await this.client.models.generateContent({
+        model: this.config.model,
+        contents: "test",
+        config: {
           maxOutputTokens: 1,
         },
       });
-      const response = result.response;
-
-      // Check if we have a valid response
-      if (!response.text()) {
-        throw new Error("No text content in response");
-      }
     } catch (error) {
       if (error instanceof Error) {
         throw new PolarisError(
@@ -272,14 +274,14 @@ Provide your response as valid JSON only.
   }
 
   private parseEvaluationResponse(response: any): EvaluationResult {
-    const content = this.extractTextContent(response);
+    const rawContent = response.text || "";
 
     try {
-      if (!content) {
+      if (!rawContent) {
         throw new Error("No response content received");
       }
 
-      const normalizedContent = this.extractJsonPayload(content);
+      const normalizedContent = this.extractJsonPayload(rawContent);
       const parsed = JSON.parse(normalizedContent);
 
       return {
@@ -293,10 +295,8 @@ Provide your response as valid JSON only.
           tacticalThemes: parsed.tacticalThemes || [],
           positionType: parsed.positionType || "unknown",
           riskAssessment: parsed.riskAssessment || "medium",
-          tokensUsed: response.usageMetadata?.totalTokenCount || 0,
+          tokensUsed: (response as any).usage?.totalTokens || 0,
           model: this.config.model,
-          finishReason: response.candidates?.[0]?.finishReason,
-          safetyRatings: response.candidates?.[0]?.safetyRatings,
         },
       };
     } catch (error) {
@@ -312,42 +312,10 @@ Provide your response as valid JSON only.
         reasoning: `Failed to parse response: ${error}`,
         metadata: {
           parseError: true,
-          rawResponse: content || response.text?.(),
+          rawResponse: rawContent || undefined,
         },
       };
     }
-  }
-
-  private extractTextContent(response: any): string {
-    try {
-      if (typeof response?.text === "function") {
-        const text = response.text();
-        if (text) {
-          return String(text).trim();
-        }
-      }
-    } catch (error) {
-      this.logger.debug("Failed to read response.text()", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    const candidates: any[] = response?.candidates ?? [];
-    const parts: string[] = [];
-
-    for (const candidate of candidates) {
-      const candidateParts =
-        candidate?.content?.parts ?? candidate?.parts ?? [];
-      for (const part of candidateParts) {
-        if (typeof part?.text === "string") {
-          parts.push(part.text);
-        } else if (typeof part === "string") {
-          parts.push(part);
-        }
-      }
-    }
-
-    return parts.join("\n").trim();
   }
 
   private extractJsonPayload(content: string): string {

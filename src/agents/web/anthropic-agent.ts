@@ -13,8 +13,8 @@ import { PolarisError } from "../../errors/base";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
-export const DEFAULT_ANTHROPIC_NAME = "Claude-3.5 Sonnet";
-export const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-sonnet-20250219";
+export const DEFAULT_ANTHROPIC_NAME = "Claude Sonnet 4.5 ";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
 
 /**
  * Anthropic-specific configuration
@@ -56,9 +56,7 @@ export class AnthropicAgent extends BaseAgent {
 
     // Initialize Anthropic client
     this.client = new Anthropic({
-      apiKey: this.config.apiKey,
-      timeout: EnvironmentConfig.ANTHROPIC.timeout || 30000,
-      maxRetries: EnvironmentConfig.ANTHROPIC.maxRetries || 3,
+      apiKey: this.config.apiKey
     });
 
     this.systemPrompt =
@@ -127,6 +125,9 @@ export class AnthropicAgent extends BaseAgent {
         system: this.systemPrompt,
         messages,
       });
+
+      this.logger.debug("Anthropic API response received", anthropicResponse);
+
       const evaluation = this.parseEvaluationResponse(anthropicResponse);
 
       // Update statistics

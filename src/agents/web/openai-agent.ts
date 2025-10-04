@@ -134,6 +134,11 @@ export class OpenAIAgent extends BaseAgent {
 
       const openAIResponse =
         await this.client.chat.completions.create(requestParams);
+      
+      this.logger.debug("OpenAI response received", {
+        response: openAIResponse,
+      });
+      
       const evaluation = this.parseEvaluationResponse(openAIResponse);
 
       // Update statistics
