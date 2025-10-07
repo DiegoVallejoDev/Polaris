@@ -115,7 +115,7 @@ export class GoogleAgent extends BaseAgent {
         model: this.config.model,
         contents: [
           {
-            role: "system",
+            role: "model",
             parts: [{ text: this.systemPrompt }],
           },
           {
