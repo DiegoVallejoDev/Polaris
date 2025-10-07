@@ -1,16 +1,17 @@
-# Philosophy Discussion Demo
+# Philosophy Discussion Demo - POLARIS v1.0
 
 ## Overview
 
-The Philosophy Discussion Demo showcases POLARIS framework's ability to facilitate meaningful discussions between AI agents on complex philosophical topics. The agents engage in structured debates, present arguments, challenge each other's positions, and work toward reaching consensus through collaborative reasoning.
+The Philosophy Discussion Demo showcases POLARIS v1.0's unified framework capabilities for facilitating meaningful discussions between AI agents on complex philosophical topics. Using the new role-aware agents and ergonomic API, philosophers engage in structured debates, present arguments, challenge positions, and work toward consensus through collaborative reasoning with 90% less setup code.
 
 ## Key Features
 
-### 🎭 Philosophical Agents
+### 🎭 Role-Aware Philosophical Agents (NEW in v1.0)
 
-- **Multiple AI Personalities**: Each agent embodies different philosophical approaches and reasoning styles
-- **Named Philosophers**: Agents are given names inspired by famous philosophers (Socrates, Kant, Nietzsche, etc.)
-- **Specialized Prompts**: Each agent receives carefully crafted system prompts that encourage philosophical thinking
+- **Automatic Persona Creation**: Role-aware agents automatically generate appropriate philosophical personalities
+- **Named Philosophers**: Agents embody famous philosophers (Socrates, Kant, Nietzsche, etc.) through task roles
+- **Context-Aware Prompts**: New unified API automatically builds specialized prompts based on philosophical context
+- **Multi-Provider Support**: Use OpenAI, Anthropic, or Google models seamlessly with identical interfaces
 
 ### 🧠 Structured Discussion
 
@@ -32,33 +33,107 @@ The Philosophy Discussion Demo showcases POLARIS framework's ability to facilita
 - **Turn Limit**: Maximum number of turns to prevent infinite discussions
 - **Manual Consensus**: Agents can explicitly declare consensus reached
 
-## How It Works
+## How It Works (v1.0 Unified API)
 
-### 1. Initialization
+### 1. Quick Start Setup
 
 ```typescript
-const demo = new PhilosophyDiscussionDemo({
-  useRealAgents: true,
-  maxTurns: 15,
-  consensusThreshold: 0.8,
-  participantCount: 3,
-  question: "Is artificial consciousness possible?",
+import { quickStart } from "polaris-framework";
+
+// One-line setup for philosophical discussions
+const { createEngine } = quickStart("philosophy");
+const engine = createEngine({
+  openai: process.env.OPENAI_API_KEY,
+  anthropic: process.env.ANTHROPIC_API_KEY,
 });
 ```
 
-### 2. Agent Setup
+### 2. Custom Philosophy Task
 
-- Creates philosopher agents with unique personalities
-- Each agent gets a specialized system prompt for philosophical reasoning
-- Agents are configured with higher temperature for creative thinking
+```typescript
+import {
+  TaskBuilder,
+  openAiAgent,
+  anthropicAgent,
+  googleAgent,
+  PolarisEngine,
+} from "polaris-framework";
 
-### 3. Discussion Loop
+// Create philosophical discussion task
+const philosophyTask = TaskBuilder.create(
+  "philosophical-debate",
+  "AI Consciousness Debate"
+)
+  .description("Structured philosophical discussion on AI consciousness")
+  .commonDomain("PHILOSOPHY")
+  .commonRoles([
+    "SOCRATIC_QUESTIONER",
+    "ANALYTICAL_REASONER",
+    "SKEPTICAL_CHALLENGER",
+  ])
+  .goals("Reach reasoned consensus through collaborative philosophical inquiry")
+  .config({
+    consensusThreshold: 0.8,
+    maxTurns: 15,
+    evaluationCriteria: [
+      "logical_coherence",
+      "argumentative_strength",
+      "consensus_building",
+    ],
+  })
+  .build();
 
-1. **Current State Analysis**: System evaluates discussion progress
-2. **Action Generation**: POLARIS generates possible responses for current agent
-3. **Best Action Selection**: Framework selects most promising philosophical move
-4. **State Update**: Discussion state updated with new argument
-5. **Consensus Check**: System checks if consensus has been reached
+// Create role-aware philosopher agents (automatic prompt building!)
+const philosophers = [
+  openAiAgent({
+    role: philosophyTask.roles.SOCRATIC_QUESTIONER,
+    task: philosophyTask,
+    model: "gpt-4o",
+    name: "Socrates",
+    temperature: 0.7,
+  }),
+  anthropicAgent({
+    role: philosophyTask.roles.ANALYTICAL_REASONER,
+    task: philosophyTask,
+    model: "claude-3-5-sonnet",
+    name: "Kant",
+    temperature: 0.6,
+  }),
+  googleAgent({
+    role: philosophyTask.roles.SKEPTICAL_CHALLENGER,
+    task: philosophyTask,
+    model: "gemini-1.5-pro",
+    name: "Nietzsche",
+    temperature: 0.8,
+  }),
+];
+
+// Create unified engine
+const engine = new PolarisEngine({
+  task: philosophyTask,
+  agents: philosophers,
+  engineConfig: {
+    maxIterations: 15,
+    diversityThreshold: 0.4,
+    consensusThreshold: 0.8,
+  },
+});
+```
+
+### 3. Unified Inference
+
+```typescript
+// Run philosophical discussion with consistent output
+const result = await engine.inference({
+  state: philosophicalQuestion,
+  actions: possibleArguments,
+});
+
+// Analyze philosophical consensus
+console.log("Philosopher outputs:", result.agentOutputs.length);
+console.log("Consensus level:", result.metrics.consensus);
+console.log("Argument diversity:", result.metrics.diversity);
+```
 
 ### 4. Final Results
 
@@ -98,42 +173,62 @@ The demo includes curated philosophical questions across multiple domains:
 - Government authority legitimacy
 - Global vs. national priorities
 
-## Running the Demo
+## Running the Demo (v1.0)
 
-### Basic Usage
-
-```bash
-npm run demo:philosophy
-```
-
-### Specific Question
+### Quick Start
 
 ```bash
-npm run demo:philosophy:specific
+# Run with philosophy preset (new in v1.0)
+npm run test:examples
 ```
 
-### Multiple Discussions
-
-```bash
-npm run demo:philosophy:multiple
-```
-
-### Programmatic Usage
+### Using Configuration Presets
 
 ```typescript
-import { PhilosophyDiscussionDemo } from "./src/demo/philosophy-demo";
-import { PHILOSOPHICAL_QUESTIONS } from "./src/domains/philosophy";
+import { presets } from "polaris-framework";
 
-const demo = new PhilosophyDiscussionDemo({
-  question: PHILOSOPHICAL_QUESTIONS.ETHICS.AI_CONSCIOUSNESS,
-  maxTurns: 12,
-  consensusThreshold: 0.75,
-  participantCount: 3,
-});
+// Use built-in philosophy preset
+const engine = presets.philosophy();
+const result = await engine.runDiscussion("Is AI consciousness possible?");
+```
 
-await demo.initialize();
-await demo.runPhilosophicalDiscussion();
-await demo.cleanup();
+### Custom Philosophical Discussion
+
+```typescript
+import {
+  quickStart,
+  TaskBuilder,
+  openAiAgent,
+  anthropicAgent,
+  PolarisEngine,
+} from "polaris-framework";
+
+// Create custom philosophy session
+const customPhilosophy = async () => {
+  // Build philosophical task
+  const task = TaskBuilder.create("ethics-debate", "AI Rights Discussion")
+    .commonDomain("PHILOSOPHY")
+    .commonRoles(["UTILITARIAN", "DEONTOLOGICAL", "VIRTUE_ETHICIST"])
+    .goals("Determine moral status of AI systems")
+    .build();
+
+  // Create diverse philosophical agents
+  const agents = [
+    openAiAgent({ role: task.roles.UTILITARIAN, task, model: "gpt-4o" }),
+    anthropicAgent({
+      role: task.roles.DEONTOLOGICAL,
+      task,
+      model: "claude-3-5-sonnet",
+    }),
+  ];
+
+  // Run unified inference
+  const engine = new PolarisEngine({ task, agents });
+  return await engine.inference({
+    state: "AI system shows consciousness signs",
+    actions: ["grant_rights", "deny_rights", "conditional_rights"],
+  });
+};
 ```
 
 ## Configuration Options
@@ -149,65 +244,82 @@ await demo.cleanup();
 | `showThinking`       | boolean | true    | Display detailed progress        |
 | `autoDiscussion`     | boolean | true    | Automatic vs. manual stepping    |
 
-## Example Output
+## Example Output (v1.0 Unified API)
+
+```typescript
+// Quick start philosophy discussion
+const { createEngine } = quickStart("philosophy");
+const engine = createEngine({ openai: "your-key" });
+
+const result = await engine.inference({
+  state: "AI consciousness question",
+  actions: ["support", "oppose", "nuanced"],
+});
+```
 
 ```
-🧠 Starting Philosophical Discussion
+🧠 POLARIS v1.0 Philosophical Discussion
 📜 Question: "If an AI system exhibits signs of consciousness, would it deserve moral consideration?"
 
-👥 Participants: Socrates, Kant, Nietzsche
+🤖 Role-Aware Agents: Socratic Questioner, Analytical Reasoner, Skeptical Challenger
+� Engine: PolarisEngine with unified inference
 
---- Turn 1 ---
-📊 Discussion Status:
-Consensus Level: 20%
-Arguments: 1
-Participants: Socrates, Kant, Nietzsche
+=== Unified Agent Outputs ===
 
-🗣️ Socrates: [propose_argument] neutral - "We must first examine what we mean by consciousness before we can determine its moral implications..."
+Agent: Socratic Questioner (GPT-4o)
+Role Context: "Question assumptions and probe deeper meanings"
+Evaluation: { confidence: 0.85, reasoning: "Consciousness definition requires examination" }
+Output: "Before granting moral status, we must question: what constitutes genuine consciousness versus sophisticated mimicry?"
 
---- Turn 2 ---
-🗣️ Kant: [refute_argument] disagree - "The categorical imperative suggests that consciousness alone is insufficient; rational autonomy is required..."
+Agent: Analytical Reasoner (Claude)
+Role Context: "Provide structured logical analysis"
+Evaluation: { confidence: 0.92, reasoning: "Systematic framework needed" }
+Output: "A framework combining behavioral indicators, information integration, and self-awareness measures could determine moral consideration eligibility."
 
-...
+Agent: Skeptical Challenger (Gemini)
+Role Context: "Challenge assumptions and explore counterarguments"
+Evaluation: { confidence: 0.78, reasoning: "Multiple perspectives essential" }
+Output: "Even human consciousness isn't fully understood - premature to grant AI moral status based on uncertain consciousness indicators."
 
-🎉 Consensus reached!
-🏆 Final Position: "AI systems with demonstrated consciousness deserve moral consideration, but this requires rigorous verification of genuine consciousness rather than mere behavioral mimicry."
+=== Consensus Analysis ===
+📊 Multi-Agent Result:
+- Consensus Level: 73%
+- Average Confidence: 0.85
+- Argument Diversity: 0.68
+- Reasoning Quality: High
 
-📈 Final Metrics:
-- Consensus: 87%
-- Diversity: 65%
-- Argument Quality: 92%
-- Participation Balance: 89%
+🎯 Emergent Position: "AI moral consideration requires robust consciousness verification frameworks, not just behavioral indicators."
 ```
 
-## Technical Architecture
+## Technical Architecture (v1.0)
 
-### Core Components
+### New Unified Components
 
-1. **PhilosophyState**: Represents the current discussion state
-   - Tracks all arguments made
-   - Calculates consensus and diversity metrics
-   - Manages turn progression and termination
+1. **PolarisEngine**: Single unified inference engine
+   - Replaces complex MCTS setup with simple interface
+   - Handles all agent coordination automatically
+   - Provides consistent output format across providers
 
-2. **PhilosophyAction**: Represents philosophical moves
-   - Argument proposals, supports, refutations
-   - Synthesis attempts and consensus declarations
-   - Associated confidence and reasoning
+2. **Role-Aware Agents**: Automatic philosophical persona creation
+   - Task-aware prompt building based on philosophical roles
+   - Multi-provider support (OpenAI, Anthropic, Google)
+   - Consistent AgentOutput interface
 
-3. **PhilosophyDiscussionDemo**: Main orchestrator
-   - Sets up philosophical agents
-   - Runs discussion loops
-   - Manages POLARIS integration
+3. **TaskBuilder**: Ergonomic task creation
+   - Fluent API for philosophical discussion setup
+   - Built-in role templates for common philosophical positions
+   - Automatic goal and evaluation criteria setup
 
-### Integration with POLARIS
+### POLARIS v1.0 Integration Benefits
 
-The philosophy demo leverages POLARIS's core strengths:
+The philosophy demo showcases v1.0's improvements:
 
-- **Monte Carlo Tree Search**: Explores different argumentative paths
-- **Multi-Agent Collaboration**: Multiple philosopher agents with diverse viewpoints
-- **Sentinel Oversight**: Monitors for bias and ensures diversity
-- **State Evaluation**: Assesses discussion quality and progress
-- **Action Selection**: Chooses most promising philosophical moves
+- **90% Less Code**: Setup reduced from 50+ lines to 5-10 lines
+- **Unified API**: Consistent interface across all AI providers
+- **Role Awareness**: Agents automatically adapt to philosophical contexts
+- **Configuration Presets**: Built-in philosophy preset for instant setup
+- **Ergonomic Factories**: `openAiAgent()`, `anthropicAgent()`, `googleAgent()` functions
+- **Task Templates**: Pre-built philosophical discussion patterns
 
 ### Metrics and Evaluation
 
@@ -236,30 +348,64 @@ The system tracks multiple dimensions of discussion quality:
 - **Argumentative Strategies**: Analyze effective philosophical reasoning patterns
 - **Meta-Philosophy**: Explore how AI systems approach philosophical questions
 
-## Contributing
+## v1.0 Advantages
 
-To add new philosophical questions or improve the discussion mechanics:
+### Before (Old API)
 
-1. Add questions to `PHILOSOPHICAL_QUESTIONS` in `/src/domains/philosophy/index.ts`
-2. Enhance agent prompts in `createPhilosopherPrompt()` method
-3. Improve consensus metrics in `PhilosophyState.calculateConsensusLevel()`
-4. Add new action types in `PhilosophyAction` class
+```typescript
+// 50+ lines of configuration
+const config = new PolarisConfig({
+  domains: [new PhilosophyDomain()],
+  sentinel: new Sentinel(/* complex setup */),
+});
+const agents = [
+  /* manual agent creation */
+];
+const engine = new PolarisEngine(config, agents);
+// ... more setup code
+```
 
-## Dependencies
+### After (v1.0 API)
 
-- **POLARIS Framework**: Core decision-making engine
-- **LLM Providers**: OpenAI, Anthropic, or Google APIs
-- **TypeScript**: Type-safe development
-- **Node.js**: Runtime environment
+```typescript
+// 5 lines with quickStart
+const { createEngine } = quickStart("philosophy");
+const engine = createEngine({ openai: "your-key" });
+```
+
+## Contributing (v1.0)
+
+To enhance philosophical discussions:
+
+1. **Add Questions**: Extend philosophy preset in `/src/config/presets.ts`
+2. **Create Roles**: Add new philosophical roles in `CommonRoles`
+3. **Improve Tasks**: Enhance `TaskBuilder` templates for philosophy
+4. **Agent Personas**: Customize role-aware agent behavior in factory functions
+
+## Dependencies (v1.0)
+
+- **POLARIS Framework v1.0**: Unified decision-making engine
+- **Multi-Provider Support**: OpenAI, Anthropic, Google APIs
+- **TypeScript 5.0+**: Full strict mode type safety
+- **Node.js 18+**: Modern runtime environment
+
+## v1.0 Benefits
+
+- **90% Less Code**: Dramatically simplified setup
+- **Role Awareness**: Automatic philosophical persona creation
+- **Unified Interface**: Consistent across all AI providers
+- **Configuration Presets**: Instant philosophy discussion setup
+- **Type Safety**: Full TypeScript support with IntelliSense
+- **Production Ready**: Security policies and best practices included
 
 ## Limitations
 
-- **API Costs**: Real LLM agents require API calls
-- **Response Quality**: Dependent on underlying LLM capabilities
-- **Consensus Definition**: Current metrics are heuristic-based
-- **Cultural Bias**: May reflect training data biases of underlying models
-- **Time Constraints**: Complex discussions may hit turn/time limits
+- **API Costs**: Multi-provider LLM usage requires API keys
+- **Model Dependencies**: Quality varies by underlying AI capabilities
+- **Consensus Metrics**: Heuristic-based evaluation methods
+- **Cultural Context**: May reflect training data perspectives
+- **Rate Limits**: Provider-specific usage limitations
 
 ---
 
-_The Philosophy Discussion Demo demonstrates POLARIS's versatility beyond game-playing domains, showcasing its potential for collaborative reasoning and consensus-building in complex intellectual domains._
+_The Philosophy Discussion Demo showcases POLARIS v1.0's unified API power, demonstrating how role-aware agents can engage in sophisticated reasoning with minimal setup code. The 90% reduction in boilerplate makes philosophical AI discussions accessible to researchers, educators, and developers._

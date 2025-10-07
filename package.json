@@ -1,21 +1,21 @@
 {
   "name": "polaris-framework",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Multi-agent decision-making framework with MCTS and AI oversight",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
-    "test": "tsc && node dist/test-agents.js",
-    "test:philosophy": "ts-node test-philosophy.ts",
-    "demo": "ts-node examples/demo.ts",
-    "demo:philosophy": "ts-node examples/philosophy-demo.ts",
-    "demo:philosophy:specific": "ts-node examples/philosophy-demo.ts specific",
-    "demo:philosophy:multiple": "ts-node examples/philosophy-demo.ts multiple",
+    "test": "npm run build && node dist/examples/basic-usage.js",
+    "test:examples": "npm run build && node dist/examples/inference-examples.js",
+    "type-check": "tsc --noEmit",
     "clean": "rimraf dist",
-    "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "lint": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts examples/**/*.ts",
+    "prepublishOnly": "npm run build && npm run type-check",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "ai",

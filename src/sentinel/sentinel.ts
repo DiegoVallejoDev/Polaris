@@ -2,7 +2,6 @@
  * Main Sentinel Agent implementation for POLARIS
  */
 
-import { TreeNode } from "../core/node";
 import { EvaluationResult, EvaluationContext } from "../types/evaluation";
 import { SentinelConfig } from "../types/config";
 import { BiasDetector, BiasReport, BiasDetectionConfig } from "./bias-detector";
@@ -45,11 +44,11 @@ export interface SentinelEvaluation {
  * Context for sentinel analysis
  */
 export interface SentinelAnalysisContext {
-  /** Node being analyzed */
-  node: TreeNode;
+  /** Node/state identifier being analyzed */
+  nodeId: string;
 
-  /** Child nodes for comparison */
-  children: TreeNode[];
+  /** Child node/state identifiers for comparison */
+  childIds: string[];
 
   /** Current search depth */
   depth: number;
@@ -101,39 +100,29 @@ export class SentinelAgent {
   }
 
   /**
-   * Main evaluation method - analyze a node and its children
+   * Main evaluation method - analyze evaluations for bias and diversity
    */
   async evaluate(
     context: SentinelAnalysisContext
   ): Promise<SentinelEvaluation> {
-    const { node, children } = context;
-
-    // Collect all evaluations from the node and its children
-    const allEvaluations: EvaluationResult[] = [];
+    // Use the historical evaluations for analysis
+    const allEvaluations = context.history;
     const evaluationContexts: EvaluationContext[] = [];
 
-    // Add node's evaluations
-    for (const evaluation of node.agentEvaluations.values()) {
-      allEvaluations.push(evaluation);
-      evaluationContexts.push({
-        stateId: node.state.id,
-        depth: node.depth,
-        availableActions: node.state.getValidActions().map((a) => a.id),
+    // Create evaluation contexts for each evaluation
+    for (let i = 0; i < allEvaluations.length; i++) {
+      const evalContext: EvaluationContext = {
+        stateId: context.nodeId,
+        depth: context.depth,
+        availableActions: [], // No actions available in simplified context
         evaluationHistory: context.history,
-      });
-    }
+      };
 
-    // Add children's evaluations
-    for (const child of children) {
-      for (const evaluation of child.agentEvaluations.values()) {
-        allEvaluations.push(evaluation);
-        evaluationContexts.push({
-          stateId: child.state.id,
-          depth: child.depth,
-          availableActions: child.state.getValidActions().map((a) => a.id),
-          evaluationHistory: context.history,
-        });
+      if (context.contextData) {
+        evalContext.contextData = context.contextData;
       }
+
+      evaluationContexts.push(evalContext);
     }
 
     // Perform bias detection
@@ -176,8 +165,8 @@ export class SentinelAgent {
       confidence,
       metadata: {
         evaluationCount: allEvaluations.length,
-        nodeDepth: node.depth,
-        childrenCount: children.length,
+        nodeDepth: context.depth,
+        childrenCount: context.childIds.length,
         interventionCount: this.interventionCount,
         timestamp: Date.now(),
       },

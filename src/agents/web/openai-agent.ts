@@ -30,22 +30,25 @@ export interface OpenAIConfig extends WebAPIConfig {
 /**
  * OpenAI GPT Agent for game state evaluation
  */
+/**
+ * OpenAI-specific configuration that extends with role and task awareness
+ */
+export interface OpenAIAgentConfig extends OpenAIConfig {
+  role: import("../../types/task").AgentRole;
+  task: import("../../types/task").PolarisEngineTask;
+}
+
 export class OpenAIAgent extends BaseAgent {
   private config: OpenAIConfig;
   private client: OpenAI;
   private systemPrompt: string;
   private logger: Logger;
 
-  constructor(config: OpenAIConfig) {
+  constructor(config: OpenAIAgentConfig) {
     // Generate ID if not provided
     const agentId = config.id || BaseAgent.generateAgentId("OpenAI");
 
-    super(agentId, config.name || DEFAULT_OPENAI_NAME, "WebAPI", {
-      ...config,
-      provider: "openai",
-    });
-
-    this.config = {
+    const baseConfig: OpenAIConfig = {
       ...config,
       id: agentId,
       name: config.name || DEFAULT_OPENAI_NAME,
@@ -54,8 +57,21 @@ export class OpenAIAgent extends BaseAgent {
       model: config.model || DEFAULT_OPENAI_MODEL,
       maxTokens: config.maxTokens || 1000,
       temperature: config.temperature || 0.7,
-      systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
+
+    super({
+      id: agentId,
+      name: config.name || DEFAULT_OPENAI_NAME,
+      type: "openai",
+      role: config.role,
+      task: config.task,
+      parameters: {
+        ...baseConfig,
+        provider: "openai",
+      },
+    });
+
+    this.config = baseConfig;
 
     // Initialize OpenAI client
     this.client = new OpenAI({
@@ -66,8 +82,7 @@ export class OpenAIAgent extends BaseAgent {
       maxRetries: EnvironmentConfig.OPENAI.maxRetries || 3,
     });
 
-    this.systemPrompt =
-      this.config.systemPrompt || this.getDefaultSystemPrompt();
+    this.systemPrompt = config.systemPrompt || this.getDefaultSystemPrompt();
     this.logger = new Logger(
       `OpenAIAgent-${this.id}`,
       EnvironmentConfig.POLARIS.logLevel
@@ -77,6 +92,8 @@ export class OpenAIAgent extends BaseAgent {
       model: this.config.model,
       maxTokens: this.config.maxTokens,
       temperature: this.config.temperature,
+      role: this.role.name,
+      task: this.task.name,
     });
   }
 
@@ -97,7 +114,10 @@ export class OpenAIAgent extends BaseAgent {
     }
   }
 
-  async evaluate(gameState: GameState): Promise<EvaluationResult> {
+  async evaluate(
+    gameState: GameState,
+    actions?: Action[]
+  ): Promise<import("../../types/agent-output").AgentOutput> {
     if (!this.isReady()) {
       throw new PolarisError("OpenAI agent not ready");
     }
@@ -105,10 +125,8 @@ export class OpenAIAgent extends BaseAgent {
     const startTime = performance.now();
 
     try {
-      this.statistics.totalEvaluations++;
-
-      // Prepare the evaluation prompt
-      const prompt = this.buildEvaluationPrompt(gameState);
+      // Prepare the evaluation prompt using the new role/task-aware method
+      const prompt = this.buildPrompt(gameState, actions);
 
       // Make API call to OpenAI
       const messages: ChatCompletionMessageParam[] = [
@@ -134,61 +152,77 @@ export class OpenAIAgent extends BaseAgent {
 
       const openAIResponse =
         await this.client.chat.completions.create(requestParams);
-      
+
       this.logger.debug("OpenAI response received", {
         response: openAIResponse,
       });
-      
+
       const evaluation = this.parseEvaluationResponse(openAIResponse);
+      const processingTime = performance.now() - startTime;
+      evaluation.evaluationTime = processingTime;
+
+      // Create unified agent output
+      const output = this.createAgentOutput(
+        evaluation,
+        processingTime,
+        this.config.model,
+        openAIResponse.usage?.total_tokens || 0
+      );
 
       // Update statistics
-      const evaluationTime = performance.now() - startTime;
-      evaluation.evaluationTime = evaluationTime;
-      this.updateStatistics(evaluation);
+      this.updateStatisticsFromOutput(output);
 
       this.logger.debug("OpenAI evaluation completed", {
         gameStateId: gameState.id,
-        evaluationTime,
+        processingTime,
         confidence: evaluation.confidence,
         tokensUsed: openAIResponse.usage?.total_tokens || 0,
       });
 
-      return evaluation;
+      return output;
     } catch (error) {
       this.statistics.errorCount++;
       this.logger.errorSafe("OpenAI evaluation failed", error);
 
       let errorMessage = String(error);
-      let errorMetadata: any = { error: true };
+      let errorType = "UNKNOWN_ERROR";
 
       if (error instanceof OpenAI.APIError) {
         errorMessage = `OpenAI API Error: ${error.message}`;
-        errorMetadata = {
-          ...errorMetadata,
-          status: error.status,
-          type: error.type,
-          code: error.code,
-        };
+        errorType = "OPENAI_API_ERROR";
       } else if (error instanceof OpenAI.APIConnectionError) {
         errorMessage = `OpenAI Connection Error: ${error.message}`;
-        errorMetadata.connectionError = true;
+        errorType = "OPENAI_CONNECTION_ERROR";
       } else if (error instanceof OpenAI.RateLimitError) {
         errorMessage = `OpenAI Rate Limit Error: ${error.message}`;
-        errorMetadata.rateLimited = true;
+        errorType = "OPENAI_RATE_LIMIT_ERROR";
       }
 
-      // Return a default evaluation on error
-      return {
+      // Create error evaluation
+      const fallbackEvaluation: EvaluationResult = {
         agentId: this.id,
         score: 0.5, // Neutral score
         confidence: 0.1, // Low confidence
         reasoning: `Evaluation failed: ${errorMessage}`,
         metadata: {
-          ...errorMetadata,
+          error: true,
           errorMessage,
           evaluationTime: performance.now() - startTime,
         },
       };
+
+      // Return error output
+      return this.createAgentOutput(
+        fallbackEvaluation,
+        performance.now() - startTime,
+        this.config.model,
+        0,
+        {
+          hasError: true,
+          message: errorMessage,
+          type: errorType,
+        }
+      );
     }
   }
 
@@ -206,7 +240,11 @@ export class OpenAIAgent extends BaseAgent {
   }
 
   clone(): OpenAIAgent {
-    return new OpenAIAgent({ ...this.config });
+    return new OpenAIAgent({
+      ...this.config,
+      role: this.role,
+      task: this.task,
+    } as OpenAIAgentConfig);
   }
 
   override async cleanup(): Promise<void> {
@@ -234,40 +272,6 @@ export class OpenAIAgent extends BaseAgent {
         "OPENAI_CONNECTION_ERROR"
       );
     }
-  }
-
-  private buildEvaluationPrompt(gameState: GameState): string {
-    return `
-Please evaluate the following game state and provide a comprehensive analysis.
-
-Game State Information:
-- State ID: ${gameState.id}
-- Current Player: ${gameState.currentPlayer}
-- Turn Number: ${gameState.getTurnNumber()}
-- Is Terminal: ${gameState.isTerminal}
-- Game-specific Data: ${JSON.stringify(gameState.serialize(), null, 2)}
-
-Please analyze this position and provide your evaluation in the following JSON format:
-{
-  "score": <number between 0 and 1, where 0.5 is neutral>,
-  "confidence": <number between 0 and 1 indicating certainty>,
-  "reasoning": "<detailed explanation of your evaluation>",
-  "keyFactors": ["<factor1>", "<factor2>", ...],
-  "recommendedActions": ["<action1>", "<action2>", ...],
-  "tacticalThemes": ["<theme1>", "<theme2>", ...],
-  "positionType": "<opening/middlegame/endgame/etc>",
-  "riskAssessment": "<low/medium/high>"
-}
-
-Focus on:
-1. Material balance and piece activity
-2. King safety and tactical opportunities
-3. Pawn structure and long-term considerations
-4. Control of key squares and files
-5. Overall position assessment from current player's perspective
-
-Provide your response as valid JSON only.
-`;
   }
 
   private parseEvaluationResponse(
@@ -350,20 +354,24 @@ Provide your response as valid JSON only.
   }
 
   private getDefaultSystemPrompt(): string {
-    return `You are GPT, an expert chess analysis AI assistant specializing in position evaluation. Your role is to:
+    return `You are an expert AI assistant specializing in analysis and evaluation. You have been assigned a specific role and task context that should guide your analysis.
 
-1. Analyze chess positions objectively and thoroughly
-2. Consider both tactical and strategic elements
-3. Provide numerical evaluations from the current player's perspective
-4. Explain your reasoning clearly and concisely
-5. Identify key themes and patterns in the position
+Your core capabilities:
+1. Analyze situations objectively and thoroughly
+2. Consider multiple perspectives and factors
+3. Provide numerical evaluations with clear reasoning
+4. Explain your thought process clearly and concisely
+5. Identify key patterns and strategic elements
 
 Always respond in valid JSON format as requested. Your evaluations should be:
 - Accurate and well-reasoned
 - Consistent in scoring methodology
+- Aligned with your assigned role's perspective
 - Helpful for decision-making processes
-- Focused on the most important positional factors
+- Focused on the most relevant factors for the given domain
 
-Remember: A score of 0.5 represents equal/neutral positions, above 0.5 favors the current player, below 0.5 favors the opponent.`;
+Remember: A score of 0.5 represents neutral/balanced situations, above 0.5 indicates favorable outcomes for the current position/player, below 0.5 indicates unfavorable outcomes.
+
+Pay special attention to your role-specific instructions and perspective when analyzing each situation.`;
   }
 }

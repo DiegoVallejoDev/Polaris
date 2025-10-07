@@ -26,6 +26,14 @@ export interface GoogleConfig extends WebAPIConfig {
 }
 
 /**
+ * Google-specific configuration that extends with role and task awareness
+ */
+export interface GoogleAgentConfig extends GoogleConfig {
+  role: import("../../types/task").AgentRole;
+  task: import("../../types/task").PolarisEngineTask;
+}
+
+/**
  * Google Gemini Agent for game state evaluation
  */
 export class GoogleAgent extends BaseAgent {
@@ -34,16 +42,11 @@ export class GoogleAgent extends BaseAgent {
   private systemPrompt: string;
   private logger: Logger;
 
-  constructor(config: GoogleConfig) {
+  constructor(config: GoogleAgentConfig) {
     // Generate ID if not provided
     const agentId = config.id || BaseAgent.generateAgentId("Google");
 
-    super(agentId, config.name || DEFAULT_GOOGLE_NAME, "WebAPI", {
-      ...config,
-      provider: "google",
-    });
-
-    this.config = {
+    const baseConfig: GoogleConfig = {
       ...config,
       id: agentId,
       name: config.name || DEFAULT_GOOGLE_NAME,
@@ -52,8 +55,21 @@ export class GoogleAgent extends BaseAgent {
       model: config.model || DEFAULT_GOOGLE_MODEL,
       maxTokens: config.maxTokens || 1000,
       temperature: config.temperature || 0.7,
-      systemPrompt: config.systemPrompt || this.getDefaultSystemPrompt(),
     };
+
+    super({
+      id: agentId,
+      name: config.name || DEFAULT_GOOGLE_NAME,
+      type: "google",
+      role: config.role,
+      task: config.task,
+      parameters: {
+        ...baseConfig,
+        provider: "google",
+      },
+    });
+
+    this.config = baseConfig;
 
     // Initialize Google GenAI client
     this.client = new GoogleGenAI({ apiKey: this.config.apiKey });
@@ -68,6 +84,8 @@ export class GoogleAgent extends BaseAgent {
       model: this.config.model,
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,
+      role: this.role.name,
+      task: this.task.name,
     });
   }
 
@@ -97,7 +115,10 @@ export class GoogleAgent extends BaseAgent {
     }
   }
 
-  async evaluate(gameState: GameState): Promise<EvaluationResult> {
+  async evaluate(
+    gameState: GameState,
+    actions?: Action[]
+  ): Promise<import("../../types/agent-output").AgentOutput> {
     if (!this.isReady()) {
       throw new PolarisError("Google agent not ready");
     }
@@ -105,10 +126,8 @@ export class GoogleAgent extends BaseAgent {
     const startTime = performance.now();
 
     try {
-      this.statistics.totalEvaluations++;
-
-      // Prepare the evaluation prompt
-      const userPrompt = this.buildEvaluationPrompt(gameState);
+      // Prepare the evaluation prompt using the new role/task-aware method
+      const userPrompt = this.buildPrompt(gameState, actions);
 
       // Make API call to Google Gemini
       const geminiResponse = await this.client.models.generateContent({
@@ -136,20 +155,28 @@ export class GoogleAgent extends BaseAgent {
       this.logger.debug("Google API response received", geminiResponse);
 
       const evaluation = this.parseEvaluationResponse(geminiResponse);
+      const processingTime = performance.now() - startTime;
+      evaluation.evaluationTime = processingTime;
+
+      // Create unified agent output
+      const output = this.createAgentOutput(
+        evaluation,
+        processingTime,
+        this.config.model,
+        (geminiResponse as any).usage?.totalTokens || 0
+      );
 
       // Update statistics
-      const evaluationTime = performance.now() - startTime;
-      evaluation.evaluationTime = evaluationTime;
-      this.updateStatistics(evaluation);
+      this.updateStatisticsFromOutput(output);
 
       this.logger.debug("Google evaluation completed", {
         gameStateId: gameState.id,
-        evaluationTime,
+        processingTime,
         confidence: evaluation.confidence,
         tokensUsed: (geminiResponse as any).usage?.totalTokens || 0,
       });
 
-      return evaluation;
+      return output;
     } catch (error) {
       this.statistics.errorCount++;
       this.logger.errorSafe("Google evaluation failed", error);
@@ -175,8 +202,8 @@ export class GoogleAgent extends BaseAgent {
         }
       }
 
-      // Return a default evaluation on error
-      return {
+      // Create error evaluation
+      const fallbackEvaluation: EvaluationResult = {
         agentId: this.id,
         score: 0.5, // Neutral score
         confidence: 0.1, // Low confidence
@@ -187,6 +214,21 @@ export class GoogleAgent extends BaseAgent {
           evaluationTime: performance.now() - startTime,
         },
       };
+
+      // Return error output
+      return this.createAgentOutput(
+        fallbackEvaluation,
+        performance.now() - startTime,
+        this.config.model,
+        0,
+        {
+          hasError: true,
+          message: errorMessage,
+          type: errorMetadata.rateLimited
+            ? "GOOGLE_RATE_LIMIT_ERROR"
+            : "GOOGLE_API_ERROR",
+        }
+      );
     }
   }
 
@@ -204,7 +246,11 @@ export class GoogleAgent extends BaseAgent {
   }
 
   clone(): GoogleAgent {
-    return new GoogleAgent({ ...this.config });
+    return new GoogleAgent({
+      ...this.config,
+      role: this.role,
+      task: this.task,
+    } as GoogleAgentConfig);
   }
 
   override async cleanup(): Promise<void> {
@@ -237,40 +283,6 @@ export class GoogleAgent extends BaseAgent {
         "GOOGLE_CONNECTION_ERROR"
       );
     }
-  }
-
-  private buildEvaluationPrompt(gameState: GameState): string {
-    return `
-Please evaluate the following game state and provide a comprehensive analysis.
-
-Game State Information:
-- State ID: ${gameState.id}
-- Current Player: ${gameState.currentPlayer}
-- Turn Number: ${gameState.getTurnNumber()}
-- Is Terminal: ${gameState.isTerminal}
-- Game-specific Data: ${JSON.stringify(gameState.serialize(), null, 2)}
-
-Please analyze this position and provide your evaluation in the following JSON format:
-{
-  "score": <number between 0 and 1, where 0.5 is neutral>,
-  "confidence": <number between 0 and 1 indicating certainty>,
-  "reasoning": "<detailed explanation of your evaluation>",
-  "keyFactors": ["<factor1>", "<factor2>", ...],
-  "recommendedActions": ["<action1>", "<action2>", ...],
-  "tacticalThemes": ["<theme1>", "<theme2>", ...],
-  "positionType": "<opening/middlegame/endgame/etc>",
-  "riskAssessment": "<low/medium/high>"
-}
-
-Focus on:
-1. Material balance and piece activity
-2. King safety and tactical opportunities
-3. Pawn structure and long-term considerations
-4. Control of key squares and files
-5. Overall position assessment from current player's perspective
-
-Provide your response as valid JSON only.
-`;
   }
 
   private parseEvaluationResponse(response: any): EvaluationResult {
@@ -356,20 +368,24 @@ Provide your response as valid JSON only.
   }
 
   private getDefaultSystemPrompt(): string {
-    return `You are Gemini, an expert chess analysis AI assistant specializing in position evaluation. Your role is to:
+    return `You are Gemini, an expert AI assistant specializing in analysis and evaluation. You have been assigned a specific role and task context that should guide your analysis.
 
-1. Analyze chess positions objectively and thoroughly
-2. Consider both tactical and strategic elements
-3. Provide numerical evaluations from the current player's perspective
-4. Explain your reasoning clearly and concisely
-5. Identify key themes and patterns in the position
+Your core capabilities:
+1. Analyze situations objectively and thoroughly
+2. Consider multiple perspectives and factors
+3. Provide numerical evaluations with clear reasoning
+4. Explain your thought process clearly and concisely
+5. Identify key patterns and strategic elements
 
 Always respond in valid JSON format as requested. Your evaluations should be:
 - Accurate and well-reasoned
 - Consistent in scoring methodology
+- Aligned with your assigned role's perspective
 - Helpful for decision-making processes
-- Focused on the most important positional factors
+- Focused on the most relevant factors for the given domain
 
-Remember: A score of 0.5 represents equal/neutral positions, above 0.5 favors the current player, below 0.5 favors the opponent.`;
+Remember: A score of 0.5 represents neutral/balanced situations, above 0.5 indicates favorable outcomes for the current position/player, below 0.5 indicates unfavorable outcomes.
+
+Pay special attention to your role-specific instructions and perspective when analyzing each situation.`;
   }
 }
