@@ -5,6 +5,292 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Dual-Mode Design](#dual-mode-design)
+- [Flat Inference Mode](#flat-inference-mode)
+- [Pipeline Mode (Polaris Creativa)](#pipeline-mode-polaris-creativa)
+- [Agent System](#agent-system)
+- [Strategy Pattern](#strategy-pattern)
+- [Sentinel Oversight](#sentinel-oversight)
+- [Domain System](#domain-system)
+- [Project Structure](#project-structure)
+
+---
+
+## Overview
+
+POLARIS is a multi-agent decision-making framework with two execution modes:
+
+1. **Flat Inference** — parallel multi-agent evaluation with role-aware prompts
+2. **Pipeline (Polaris Creativa)** — 4-layer creative pipeline with decay-based reinjection
+
+Both modes share the same agent system, task definitions, and output format.
+
+```
+┌─────────────────────────────────────────────────┐
+│                  PolarisEngine                   │
+│                                                  │
+│   mode: "flat"           mode: "pipeline"        │
+│   ┌──────────┐           ┌──────────────────┐   │
+│   │ Parallel │           │  LayerPipeline   │   │
+│   │ Agents   │           │  (4-layer loop)  │   │
+│   └──────────┘           └──────────────────┘   │
+│         │                        │               │
+│         └────────┬───────────────┘               │
+│                  ▼                                │
+│            EngineOutput                           │
+└─────────────────────────────────────────────────┘
+```
+
+## Dual-Mode Design
+
+`PolarisEngine` is the single entry point. The `mode` field in config selects the execution path:
+
+```typescript
+// Flat mode (default) — parallel multi-agent inference
+const engine = new PolarisEngine({ task, agents, mode: "flat" });
+
+// Pipeline mode — 4-layer creative pipeline
+const engine = new PolarisEngine({
+  task,
+  agents,
+  mode: "pipeline",
+  pipelineConfig: { decayConfig, divergentAgents, ... }
+});
+```
+
+Both modes return `EngineOutput` with the same shape. Pipeline mode attaches additional metadata (`pipelineResult`) for iteration tracking.
+
+---
+
+## Flat Inference Mode
+
+The original execution path. All agents evaluate the same state in parallel and return independent outputs.
+
+```
+State + Actions
+       │
+       ▼
+  ┌─────────┐
+  │ Agent 1  │──┐
+  │ Agent 2  │──┤── All run in parallel
+  │ Agent N  │──┘
+  └─────────┘
+       │
+       ▼
+  EngineOutput (array of AgentOutput)
+```
+
+Key characteristics:
+- Agents are **role-aware** — prompts built automatically from `AgentRole` and `PolarisEngineTask`
+- Supports OpenAI, Anthropic, and Google providers
+- No inter-agent communication
+- Single-pass evaluation
+
+---
+
+## Pipeline Mode (Polaris Creativa)
+
+A 4-layer creative pipeline with decay-based quality loop.
+
+```
+                    ┌──────────────────────────────────────┐
+                    │           DECAY LOOP                  │
+                    │                                       │
+ ┌──────────┐      │  ┌────────────┐    ┌──────────────┐  │
+ │ Layer 1   │──────┼─▶│  Layer 2   │───▶│   Layer 3    │  │
+ │ Divergent │      │  │ Inquisitor │    │ Synthesizer  │  │
+ │ T=0.8-1.0 │      │  │ T=0.1-0.3  │    │  T=0.3-0.5   │  │
+ │ (parallel)│      │  │ (filter)   │    │  (weave)     │  │
+ └──────────┘      │  └────────────┘    └──────┬───────┘  │
+                    │                           │          │
+                    │                    ┌──────▼───────┐  │
+                    │                    │   Layer 4    │  │
+                    │                    │ Orchestrator │  │
+                    │                    │  T=0.1       │  │
+                    │                    │ (quality gate)│  │
+                    │                    └──────┬───────┘  │
+                    │                           │          │
+                    │              ┌─────────────┤          │
+                    │              │  deliver?   │          │
+                    │              │  or rerun?  │          │
+                    │              ▼             ▼          │
+                    │           OUTPUT     REINJECTION ─────┘
+                    └──────────────────────────────────────┘
+```
+
+### Layer Descriptions
+
+| Layer | Name | Temperature | Purpose |
+|-------|------|-------------|---------|
+| 1 | **Divergent** | 0.8–1.0 | Parallel creative exploration (multiple agents) |
+| 2 | **Inquisitor** | 0.1–0.3 | Filters explorations for logical coherence |
+| 3 | **Synthesizer** | 0.3–0.5 | Weaves validated fragments into structured draft |
+| 4 | **Orchestrator** | 0.1 | ROI-aware quality gate (deliver vs. rerun) |
+
+### Decay Loop
+
+When the Orchestrator decides to **rerun**, the pipeline iterates with:
+- **Temperature increment** — progressively higher creativity
+- **Correction prompt** — accumulated deficiency feedback
+- **Token budget tracking** — ROI-aware cost control
+- **Forced delivery** — guaranteed termination at `maxIterations` or budget exhaustion
+
+### Strict Context Isolation
+
+Layers communicate only via typed `LayerMessage<T>` payloads. Each layer sees **only** its predecessor's output — no cross-layer context leakage.
+
+---
+
+## Agent System
+
+### Hierarchy
+
+```
+Agent (interface)
+  └── BaseAgent (abstract)
+        ├── OpenAIAgent        — Flat mode
+        ├── AnthropicAgent     — Flat mode
+        ├── GoogleAgent        — Flat mode
+        └── StrategyAgent (abstract)
+              └── OpenAIStrategyAgent  — Pipeline mode
+```
+
+### Flat Agents
+
+`OpenAIAgent`, `AnthropicAgent`, `GoogleAgent` — self-contained agents that build their own prompts from `AgentRole` and `PolarisEngineTask`. Used in flat inference mode.
+
+### Strategy Agents
+
+`StrategyAgent` is **layer-blind**. It delegates all prompt construction to an injected `PromptStrategy` and all output parsing to an injected `OutputParserStrategy`. The same agent class works in any pipeline layer — behavior is determined entirely by the injected strategies.
+
+---
+
+## Strategy Pattern
+
+The pipeline uses the Strategy pattern to eliminate layer-mode conditionals:
+
+```
+PromptStrategy (interface)
+  ├── DivergentPromptStrategy
+  ├── InquisitorPromptStrategy
+  ├── SynthesizerPromptStrategy
+  └── OrchestratorPromptStrategy
+
+OutputParserStrategy (interface)
+  ├── DivergentOutputParser
+  ├── InquisitorOutputParser
+  ├── SynthesizerOutputParser
+  └── OrchestratorOutputParser
+```
+
+Each strategy pair handles:
+- **System/user prompt construction** from `PromptContext`
+- **Temperature and token limits** based on layer requirements
+- **Output parsing** (JSON for Inquisitor/Orchestrator, free-text for others)
+
+### Structured Outputs
+
+Layers 2 (Inquisitor) and 4 (Orchestrator) use OpenAI Structured Outputs (`response_format: json_schema`) for deterministic parsing. Schemas are defined in `src/strategies/schemas.ts`.
+
+---
+
+## Sentinel Oversight
+
+The Sentinel system provides meta-cognitive oversight for agent outputs:
+
+- **SentinelAgent** — evaluates agent outputs for quality and consistency
+- **BiasDetector** — identifies cognitive and statistical biases
+- **DiversityAnalyzer** — measures diversity across agent perspectives
+
+Used in flat inference mode to validate multi-agent output quality.
+
+---
+
+## Domain System
+
+Domains define the state and action types for specific problem spaces:
+
+```
+GameState (abstract)
+  ├── BaseGameState (general)
+  ├── PhilosophicalState
+  └── ChessState
+
+Action (abstract)
+  ├── BaseAction (general)
+  ├── PhilosophicalAction
+  └── ChessAction
+```
+
+Both flat and pipeline modes can operate on any domain.
+
+---
+
+## Project Structure
+
+```
+src/
+├── agents/
+│   ├── base/
+│   │   ├── agent.ts              # BaseAgent abstract class
+│   │   ├── parameters.ts         # Agent configuration types
+│   │   └── strategy-agent.ts     # Strategy-aware agent base
+│   ├── factories/
+│   │   └── agent-factory.ts      # Ergonomic agent creation
+│   └── web/
+│       ├── openai-agent.ts       # OpenAI flat agent
+│       ├── anthropic-agent.ts    # Anthropic flat agent
+│       ├── google-agent.ts       # Google flat agent
+│       └── openai-strategy-agent.ts  # OpenAI pipeline agent
+├── config/
+│   ├── index.ts                  # Configuration exports
+│   └── presets.ts                # Built-in presets
+├── domains/
+│   ├── base/                     # Abstract domain types
+│   ├── chess/                    # Chess domain
+│   └── philosophy/               # Philosophy domain
+├── engine/
+│   ├── polaris-engine.ts         # Main engine (both modes)
+│   └── layer-pipeline.ts         # 4-layer pipeline engine
+├── errors/
+│   └── base.ts                   # Error types
+├── sentinel/
+│   ├── sentinel.ts               # Meta-evaluator
+│   ├── bias-detector.ts          # Bias detection
+│   └── diversity-analyzer.ts     # Diversity analysis
+├── strategies/
+│   ├── index.ts                  # Barrel export
+│   ├── prompt-strategy.ts        # PromptStrategy interface
+│   ├── output-parser-strategy.ts # OutputParserStrategy interface
+│   ├── schemas.ts                # JSON schemas for Structured Outputs
+│   ├── divergent-*.ts            # Layer 1 strategies
+│   ├── inquisitor-*.ts           # Layer 2 strategies
+│   ├── synthesizer-*.ts          # Layer 3 strategies
+│   └── orchestrator-*.ts         # Layer 4 strategies
+├── types/
+│   ├── agent-output.ts           # Unified output format
+│   ├── common.ts                 # Shared types
+│   ├── config.ts                 # Configuration types
+│   ├── evaluation.ts             # Evaluation types
+│   ├── layer.ts                  # Pipeline layer types
+│   ├── search.ts                 # Search types
+│   └── task.ts                   # Task and role definitions
+└── utils/
+    ├── config.ts                 # Environment configuration
+    ├── enhanced-config.ts        # Advanced config builder
+    ├── logger.ts                 # Logging system
+    ├── math.ts                   # Math utilities
+    ├── result.ts                 # Result pattern
+    ├── statistics.ts             # Statistics tracking
+    └── validation.ts             # Input validation
+```
+# POLARIS Architecture
+
+**Policy Optimization via Layered Agents and Recursive Inference Search**
+
+## Table of Contents
+
+- [Overview](#overview)
 - [Core Principles](#core-principles)
 - [System Architecture](#system-architecture)
 - [Component Hierarchy](#component-hierarchy)

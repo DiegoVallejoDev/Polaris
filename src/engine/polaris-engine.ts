@@ -16,6 +16,10 @@ import { Action } from "../domains/base/action";
 import { Logger } from "../utils/logger";
 import { EnvironmentConfig } from "../utils/config";
 import { PolarisError } from "../errors/base";
+import {
+  LayerPipeline,
+  LayerPipelineConfig,
+} from "./layer-pipeline";
 
 /**
  * Configuration for the PolarisEngine
@@ -50,6 +54,16 @@ export interface PolarisEngineConfig {
     /** Minimum number of successful agent outputs required */
     minSuccessfulOutputs?: number;
   };
+
+  /**
+   * Execution mode:
+   * - "flat" (default): Standard multi-agent inference via runAgents()
+   * - "pipeline": 4-layer Polaris Creativa pipeline via LayerPipeline
+   */
+  mode?: "flat" | "pipeline";
+
+  /** Pipeline configuration (required when mode === "pipeline") */
+  pipelineConfig?: LayerPipelineConfig;
 
   /** Additional configuration */
   metadata?: Record<string, any>;
@@ -136,10 +150,18 @@ export class PolarisEngine {
         stateId: params.state.id,
         actionsCount: params.actions?.length || 0,
         requestedAgents: params.agentIds?.length || "all",
+        mode: this.config.mode ?? "flat",
       });
 
       // Validate input
       this.validateInferenceParams(params);
+
+      // ── Pipeline mode: delegate to LayerPipeline ──
+      if (this.config.mode === "pipeline") {
+        return this.runPipelineMode(params, startTime);
+      }
+
+      // ── Flat mode (default): standard multi-agent inference ──
 
       // Determine which agents to use
       const selectedAgents = this.selectAgentsForInference(params.agentIds);
@@ -348,6 +370,91 @@ export class PolarisEngine {
   }
 
   // Private helper methods
+
+  /**
+   * Run inference in pipeline mode via LayerPipeline.
+   * Converts PipelineResult into EngineOutput for a unified return type.
+   */
+  private async runPipelineMode(
+    params: InferenceParams,
+    startTime: number
+  ): Promise<EngineOutput> {
+    if (!this.config.pipelineConfig) {
+      throw new PolarisError(
+        "Pipeline mode requires pipelineConfig in PolarisEngineConfig",
+        "PIPELINE_CONFIG_ERROR"
+      );
+    }
+
+    const pipeline = new LayerPipeline(this.config.pipelineConfig);
+    const pipelineResult = await pipeline.execute(
+      params.state,
+      params.actions
+    );
+
+    const totalInferenceTime = performance.now() - startTime;
+
+    // Convert PipelineResult → EngineOutput
+    const agentPerformance: Record<
+      string,
+      import("../types/agent-output").AgentPerformanceMetrics
+    > = {};
+    for (const output of pipelineResult.finalAgentOutputs) {
+      if (output.statistics) {
+        agentPerformance[output.agentId] = output.statistics;
+      }
+    }
+
+    const engineOutput: EngineOutput = {
+      agentOutputs: pipelineResult.finalAgentOutputs,
+      engineStatistics: {
+        totalInferenceTime,
+        searchStats: {
+          totalIterations: pipelineResult.totalIterations,
+          forcedDelivery: pipelineResult.forcedDelivery ? 1 : 0,
+          totalTokensConsumed: pipelineResult.totalTokensConsumed,
+        },
+        coordinationStats: {
+          pipelineMode: 1,
+          iterationCount: pipelineResult.totalIterations,
+        },
+      },
+      agentPerformance,
+      session: {
+        sessionId: this.sessionId,
+        task: {
+          id: this.config.task.id,
+          name: this.config.task.name,
+          domain: this.config.task.domain.id,
+        },
+        config: {
+          mode: "pipeline",
+          decayConfig: this.config.pipelineConfig.decayConfig,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    // Attach pipeline-specific metadata
+    (engineOutput as any).pipelineResult = {
+      finalOutput: pipelineResult.finalOutput,
+      totalIterations: pipelineResult.totalIterations,
+      forcedDelivery: pipelineResult.forcedDelivery,
+      forcedDeliveryReason: pipelineResult.forcedDeliveryReason,
+      lastVerdict: pipelineResult.lastVerdict,
+      iterationBreakdowns: pipelineResult.iterationBreakdowns,
+      totalTokensConsumed: pipelineResult.totalTokensConsumed,
+    };
+
+    this.logger.info("Pipeline inference completed", {
+      totalTime: totalInferenceTime,
+      iterations: pipelineResult.totalIterations,
+      forcedDelivery: pipelineResult.forcedDelivery,
+      tokens: pipelineResult.totalTokensConsumed,
+    });
+
+    return engineOutput;
+  }
 
   private validateAndRegisterAgents(agents: Agent[]): void {
     if (agents.length === 0) {

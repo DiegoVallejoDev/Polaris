@@ -15,6 +15,8 @@ const { testBasicPolarisSetup, testIndividualComponents } = require('./test-pola
 const { testWithRealInference, testPerformance } = require('./test-polaris-inference');
 const { simplePhilosophyTest } = require('./test-simple-philosophy');
 const { chessAnalysisTest, chessTacticsTest } = require('./test-chess-analysis');
+const { main: runStrategyTests } = require('./test-strategies');
+const { main: runPipelineTests } = require('./test-layer-pipeline');
 
 // Test configuration
 const TEST_CONFIG = {
@@ -25,7 +27,8 @@ const TEST_CONFIG = {
         basic: ['component', 'setup'],
         inference: ['performance', 'business-decision'],
         philosophy: ['consciousness-debate'],
-        chess: ['tactics', 'position-analysis']
+        chess: ['tactics', 'position-analysis'],
+        pipeline: ['layer-pipeline', 'strategies']
     }
 };
 
@@ -140,6 +143,12 @@ class TestRunner {
             await this.runTest('Chess Position Analysis', chessAnalysisTest);
         }
 
+        // Pipeline Tests
+        if (domain === 'all' || domain === 'pipeline') {
+            await this.runTest('Strategy Tests (46 assertions)', runStrategyTests);
+            await this.runTest('Layer Pipeline Tests (24 assertions)', runPipelineTests);
+        }
+
         this.printSummary();
         return this.results.failed === 0;
     }
@@ -218,7 +227,7 @@ Usage:
 
 Options:
   --domain=<domain>    Run tests for specific domain
-                       Values: all, basic, inference, philosophy, chess
+                       Values: all, basic, inference, philosophy, chess, pipeline
                        Default: all
 
   --debug             Enable debug output (stack traces, etc.)
@@ -235,6 +244,7 @@ Domains:
   inference   - Performance and multi-agent business decisions  
   philosophy  - Philosophical discourse and consciousness debates
   chess       - Chess position analysis and tactical puzzles
+  pipeline    - Polaris Creativa pipeline and strategy tests
 `);
 }
 
@@ -252,7 +262,7 @@ async function main() {
     }
 
     // Validate domain
-    const validDomains = ['all', 'basic', 'inference', 'philosophy', 'chess'];
+    const validDomains = ['all', 'basic', 'inference', 'philosophy', 'chess', 'pipeline'];
     if (!validDomains.includes(options.domain)) {
         console.error(`❌ Invalid domain: ${options.domain}`);
         console.error(`Valid domains: ${validDomains.join(', ')}`);

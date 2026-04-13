@@ -14,7 +14,10 @@ This directory contains comprehensive tests for the Polaris multi-agent decision
 - **`test-simple-philosophy.js`** - Philosophical discourse on consciousness with multiple AI perspectives
 - **`test-philosophical-discourse.js`** - Advanced philosophical debates (more comprehensive version)
 - **`test-chess-analysis.js`** - Chess position analysis with different playing styles (tactical, positional, defensive)
+### Polaris Creativa Pipeline Tests
 
+- **`test-strategies.js`** - All 8 prompt/output strategies (46 assertions): divergent, inquisitor, synthesizer, orchestrator
+- **`test-layer-pipeline.js`** - Decay loop, layer types, computeNextDecayState, edge cases (24 assertions)
 ### Test Runner
 
 - **`run-tests.js`** - Comprehensive test suite runner with filtering, timing, and reporting
@@ -45,6 +48,9 @@ node test/run-tests.js --domain=philosophy
 
 # Test chess analysis
 node test/run-tests.js --domain=chess
+
+# Test Polaris Creativa pipeline and strategies
+node test/run-tests.js --domain=pipeline
 ```
 
 ### Individual Test Files
@@ -54,6 +60,8 @@ node test/run-tests.js --domain=chess
 node test/test-polaris-basic.js
 node test/test-simple-philosophy.js
 node test/test-chess-analysis.js
+node test/test-strategies.js
+node test/test-layer-pipeline.js
 ```
 
 ## 🔑 API Keys Required

@@ -96,6 +96,9 @@ export {
 // Philosophy domain
 export * from "./domains/philosophy";
 
+// Chess domain
+export * from "./domains/chess";
+
 // Types
 export * from "./types/common";
 export * from "./types/evaluation";
@@ -156,10 +159,70 @@ export {
 // Errors
 export * from "./errors/base";
 
+// ===== POLARIS CREATIVA — 4-Layer Pipeline =====
+
+// Pipeline Engine
+export { LayerPipeline } from "./engine/layer-pipeline";
+export type {
+  LayerPipelineConfig,
+  PipelineResult,
+  IterationBreakdown,
+} from "./engine/layer-pipeline";
+
+// Strategy System
+export {
+  DivergentPromptStrategy,
+  DivergentOutputParser,
+  InquisitorPromptStrategy,
+  InquisitorOutputParser,
+  SynthesizerPromptStrategy,
+  SynthesizerOutputParser,
+  OrchestratorPromptStrategy,
+  OrchestratorOutputParser,
+  INQUISITOR_SCHEMA,
+  ORCHESTRATOR_SCHEMA,
+} from "./strategies";
+export type {
+  PromptStrategy,
+  PromptContext,
+  CumulativeTokenUsage,
+  OutputParserStrategy,
+  RawLLMResponse,
+  ParsedOutput,
+} from "./strategies";
+
+// Strategy-Aware Agents
+export { StrategyAgent } from "./agents/base/strategy-agent";
+export type { StrategyAgentConfig } from "./agents/base/strategy-agent";
+export { OpenAIStrategyAgent } from "./agents/web/openai-strategy-agent";
+export type {
+  OpenAIStrategyAgentConfig,
+  StructuredOutputSchema,
+} from "./agents/web/openai-strategy-agent";
+
+// Layer Types
+export {
+  LayerType,
+  computeNextDecayState,
+} from "./types/layer";
+export type {
+  LayerMessage,
+  LayerMessageMetadata,
+  DivergentPayload,
+  DivergentExploration,
+  InquisitorPayload,
+  SynthesizerPayload,
+  OrchestratorPayload,
+  DecayState,
+  DecayConfig,
+  ValidatedFragment,
+  OrchestratorVerdict,
+} from "./types/layer";
+
 // ===== FRAMEWORK METADATA =====
 
 // Framework version
-export const VERSION = "1.0.0"; // Production release with unified API
+export const VERSION = "2.0.0";
 
 /**
  * Framework information
@@ -170,36 +233,39 @@ export const POLARIS_INFO = {
     "Policy Optimization via Layered Agents and Recursive Inference Search",
   version: VERSION,
   description:
-    "A unified decision-making framework with role-aware agents, task templates, and ergonomic configuration",
+    "Multi-agent decision-making framework with flat inference and a 4-layer creative pipeline",
   author: "Diego Vallejo",
   license: "MIT",
   repository: "https://github.com/DiegoVallejoDev/Polaris",
   features: [
+    "Dual-mode engine (flat inference + Polaris Creativa pipeline)",
+    "4-layer creative pipeline with decay-based reinjection",
+    "Strategy pattern for layer-blind agents",
+    "Structured Outputs (json_schema) for deterministic parsing",
+    "ROI-aware token budget routing",
     "Role-aware agents with task context",
-    "Unified agent output format",
-    "Ergonomic agent creation",
-    "Configuration presets",
     "Multi-provider support (OpenAI, Anthropic, Google)",
     "Sentinel agent oversight",
-    "Backwards compatibility",
-    "90% less boilerplate code",
+    "Configuration presets",
     "Quick start helpers",
   ],
   changelog: {
+    v2_0_0: [
+      "Polaris Creativa 4-layer pipeline",
+      "Strategy pattern with 8 concrete strategies",
+      "StrategyAgent and OpenAIStrategyAgent",
+      "LayerPipeline with decay loop",
+      "Structured Outputs and AbortController support",
+      "70 new tests (strategies + pipeline)",
+    ],
     v1_0_0: [
       "Production release with unified API",
-      "90% code reduction through ergonomic design",
       "Role-aware agents with automatic prompt building",
-      "TaskBuilder for ergonomic task creation",
-      "Agent factory functions for all providers",
-      "Configuration presets for common use cases",
+      "TaskBuilder, agent factories, configuration presets",
       "PolarisEngine unified inference engine",
-      "QuickStart one-line setup",
-      "Comprehensive examples and documentation",
-      "Full TypeScript support with strict mode",
     ],
   },
-  releaseDate: "2025-10-07",
+  releaseDate: "2026-04-13",
   stability: "stable",
 } as const;
 

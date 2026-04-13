@@ -1,7 +1,7 @@
 {
   "name": "polaris-framework",
-  "version": "1.0.1",
-  "description": "Multi-agent decision-making framework with MCTS and AI oversight",
+  "version": "2.0.0",
+  "description": "Multi-agent decision-making framework with flat inference and a 4-layer creative pipeline",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "exports": {
@@ -24,6 +24,7 @@
     "test:inference": "npm run build && node test/run-tests.js --domain=inference",
     "test:philosophy": "npm run build && node test/run-tests.js --domain=philosophy",
     "test:chess": "npm run build && node test/run-tests.js --domain=chess",
+    "test:pipeline": "npm run build && node test/run-tests.js --domain=pipeline",
     "test:examples": "npm run build && node dist/examples/basic-usage.js",
     "test:debug": "npm run build && node test/run-tests.js --debug",
     "demo": "npm run build && node test/quick-demo.js",
@@ -37,14 +38,15 @@
   },
   "keywords": [
     "ai",
-    "mcts",
-    "monte-carlo-tree-search",
+    "multi-agent",
     "agent-based",
     "decision-making",
-    "chess",
-    "game-ai",
+    "creative-pipeline",
     "polaris",
-    "sentiment-analysis",
+    "llm",
+    "openai",
+    "anthropic",
+    "strategy-pattern",
     "bias-detection"
   ],
   "author": "Diego Vallejo",
