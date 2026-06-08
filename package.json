@@ -1,6 +1,6 @@
 {
   "name": "polaris-framework",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Multi-agent decision-making framework with flat inference and a 4-layer creative pipeline",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -17,23 +17,24 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
-    "test": "npm run build && node test/run-tests.js",
-    "test:basic": "npm run build && node test/run-tests.js --domain=basic",
-    "test:inference": "npm run build && node test/run-tests.js --domain=inference",
-    "test:philosophy": "npm run build && node test/run-tests.js --domain=philosophy",
-    "test:chess": "npm run build && node test/run-tests.js --domain=chess",
-    "test:pipeline": "npm run build && node test/run-tests.js --domain=pipeline",
-    "test:examples": "npm run build && node dist/examples/basic-usage.js",
-    "test:debug": "npm run build && node test/run-tests.js --debug",
-    "demo": "npm run build && node test/quick-demo.js",
+    "test": "pnpm run build && node test/run-tests.js",
+    "test:basic": "pnpm run build && node test/run-tests.js --domain=basic",
+    "test:inference": "pnpm run build && node test/run-tests.js --domain=inference",
+    "test:philosophy": "pnpm run build && node test/run-tests.js --domain=philosophy",
+    "test:chess": "pnpm run build && node test/run-tests.js --domain=chess",
+    "test:pipeline": "pnpm run build && node test/run-tests.js --domain=pipeline",
+    "test:examples": "pnpm run build && node dist/examples/basic-usage.js",
+    "test:debug": "pnpm run build && node test/run-tests.js --debug",
+    "demo": "pnpm run build && node test/quick-demo.js",
+    "demo:pipeline": "pnpm run build && node dist/examples/pipeline-demo.js",
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist",
     "lint": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts examples/**/*.ts test/**/*.js",
-    "prepublishOnly": "npm run build && npm run type-check",
-    "version": "npm run build && git add -A dist",
+    "prepublishOnly": "pnpm run build && pnpm run type-check",
+    "version": "pnpm run build && git add -A dist",
     "postversion": "git push && git push --tags"
   },
   "keywords": [
@@ -71,7 +72,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
     "@google/genai": "^1.22.0",
-    "@google/generative-ai": "^0.24.1",
     "dotenv": "^16.6.1",
     "openai": "^6.0.1",
     "uuid": "^9.0.0"

@@ -133,6 +133,11 @@ export {
   getEnvVarAsNumber,
   getEnvVarAsBoolean,
 } from "./utils/config";
+export {
+  RateLimiter,
+  ProviderRateLimiters,
+} from "./utils/rate-limiter";
+export type { RateLimiterConfig } from "./utils/rate-limiter";
 
 // Enhanced utilities
 export { Result, Ok, Err, ok, err, tryCatch, tryAsync } from "./utils/result";
