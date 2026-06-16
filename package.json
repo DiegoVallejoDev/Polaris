@@ -1,6 +1,6 @@
 {
   "name": "polaris-framework",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Multi-agent decision-making framework with flat inference and a 4-layer creative pipeline",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
