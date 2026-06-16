@@ -57,8 +57,13 @@ export {
   PresetCategories,
   PresetLoader,
   presets,
+  Models,
+  OpenAIModels,
+  AnthropicModels,
+  GoogleModels,
+  ModelTiers,
 } from "./config";
-export type { EnginePreset } from "./config";
+export type { EnginePreset, OpenAIModelId, AnthropicModelId, GoogleModelId, ModelId } from "./config";
 
 // Agent System (Refactored)
 export { Agent, BaseAgent } from "./agents/base/agent";
@@ -227,7 +232,7 @@ export type {
 // ===== FRAMEWORK METADATA =====
 
 // Framework version
-export const VERSION = "2.0.0";
+export const VERSION = "2.1.0";
 
 /**
  * Framework information
@@ -298,7 +303,14 @@ export function quickStart(
       anthropic?: string;
       google?: string;
     }) => {
-      const agents = preset.agents.map((agentConfig: any) => {
+      const agents = preset.agents.map((agentConfig: {
+        roleId: string;
+        model: string;
+        name: string;
+        maxTokens?: number;
+        temperature?: number;
+        provider: string;
+      }) => {
         const role = preset.task.roles[agentConfig.roleId];
         const config = {
           role,

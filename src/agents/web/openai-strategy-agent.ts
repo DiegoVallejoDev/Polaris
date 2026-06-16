@@ -83,7 +83,7 @@ export class OpenAIStrategyAgent extends StrategyAgent {
   private _abortSignal: AbortSignal | undefined;
 
   constructor(config: OpenAIStrategyAgentConfig) {
-    const model = config.model ?? "gpt-4o";
+    const model = config.model ?? "gpt-5.4-mini";
     const apiKey = config.apiKey ?? EnvironmentConfig.OPENAI.apiKey;
 
     super({

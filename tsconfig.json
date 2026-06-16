@@ -20,21 +20,8 @@
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@/core/*": ["src/core/*"],
-      "@/agents/*": ["src/agents/*"],
-      "@/sentinel/*": ["src/sentinel/*"],
-      "@/domains/*": ["src/domains/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/types/*": ["src/types/*"],
-      "@/errors/*": ["src/errors/*"]
-    }
+    "moduleResolution": "node10",
+    "resolveJsonModule": true
   },
   "include": ["src/**/*", "test-agents.ts", "examples/**/*"],
   "exclude": ["node_modules", "dist", "tests", "**/*.test.ts", "**/*.spec.ts"]

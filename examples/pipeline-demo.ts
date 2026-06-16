@@ -41,7 +41,7 @@ import {
   BaseAction,
   openAiAgent,
 } from "../src/index";
-import type { LayerPipelineConfig, PipelineResult } from "../src/engine/layer-pipeline";
+import type { LayerPipelineConfig } from "../src/engine/layer-pipeline";
 import type { DecayConfig } from "../src/types/layer";
 import type { Action } from "../src/domains/base/action";
 
@@ -400,8 +400,8 @@ async function runPipelineDemo() {
     console.log("─".repeat(62));
     console.log();
 
-    // The pipeline result is attached as an extended property
-    const pr = (result as any).pipelineResult as PipelineResult | undefined;
+    // The pipeline result is a typed field on EngineOutput
+    const pr = result.pipelineResult;
 
     if (pr) {
       console.log("📊 Pipeline Metrics:");

@@ -4,6 +4,7 @@
 
 import { EvaluationResult } from "./evaluation";
 import { Action } from "../domains/base/action";
+import type { OrchestratorVerdict } from "./layer";
 
 /**
  * Performance metrics for agent evaluation
@@ -223,6 +224,41 @@ export interface EngineOutput {
 
     /** Contributing agents */
     contributors: string[];
+  };
+
+  /** Pipeline result (present only when mode === "pipeline") */
+  pipelineResult?: {
+    /** The final delivered output (draft text) */
+    finalOutput: string;
+
+    /** Total pipeline iterations executed */
+    totalIterations: number;
+
+    /** Whether delivery was forced by maxIterations or budget exhaustion */
+    forcedDelivery: boolean;
+
+    /** Reason for forced delivery (if applicable) */
+    forcedDeliveryReason?: "max_iterations" | "budget_exhausted" | "insufficient_agents";
+
+    /** Orchestrator verdict from the last iteration */
+    lastVerdict: OrchestratorVerdict;
+
+    /** Per-iteration timing breakdown */
+    iterationBreakdowns: Array<{
+      iteration: number;
+      divergentTimeMs: number;
+      inquisitorTimeMs: number;
+      synthesizerTimeMs: number;
+      orchestratorTimeMs: number;
+      totalTimeMs: number;
+      verdict: OrchestratorVerdict;
+      tokensConsumed: number;
+      agentsSurvived: number;
+      agentsTimedOut: number;
+    }>;
+
+    /** Total tokens consumed across all iterations */
+    totalTokensConsumed: number;
   };
 
   /** Session information */

@@ -92,10 +92,12 @@ export class RateLimiter {
         continue;
       }
 
-      // Enforce minimum delay
+      // Enforce minimum delay with jitter to prevent thundering herd
       const elapsed = Date.now() - this.lastRequestTime;
-      if (elapsed < this.config.minDelayMs) {
-        await this.delay(this.config.minDelayMs - elapsed);
+      const jitter = Math.random() * this.config.minDelayMs * 0.2;
+      const effectiveDelay = this.config.minDelayMs + jitter;
+      if (elapsed < effectiveDelay) {
+        await this.delay(effectiveDelay - elapsed);
       }
 
       const request = this.queue.shift();

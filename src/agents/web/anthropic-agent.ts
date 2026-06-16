@@ -13,8 +13,8 @@ import { PolarisError } from "../../errors/base";
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
-export const DEFAULT_ANTHROPIC_NAME = "Claude Sonnet 4.5 ";
-export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+export const DEFAULT_ANTHROPIC_NAME = "Claude Sonnet 4.6";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 /**
  * Anthropic-specific configuration
@@ -68,6 +68,14 @@ export class AnthropicAgent extends BaseAgent {
     });
 
     this.config = baseConfig;
+
+    // Validate API key is present
+    if (!this.config.apiKey) {
+      throw new PolarisError(
+        "Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable or provide apiKey in config.",
+        "MISSING_API_KEY"
+      );
+    }
 
     // Initialize Anthropic client
     this.client = new Anthropic({

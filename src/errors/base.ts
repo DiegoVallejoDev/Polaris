@@ -8,16 +8,19 @@
 export class PolarisError extends Error {
   public readonly code: string;
   public readonly context: Record<string, any> | undefined;
+  public readonly retryable: boolean;
 
   constructor(
     message: string,
     code: string = "POLARIS_ERROR",
-    context: Record<string, any> | undefined = undefined
+    context: Record<string, any> | undefined = undefined,
+    retryable: boolean = false
   ) {
     super(message);
     this.name = this.constructor.name;
     this.code = code;
     this.context = context;
+    this.retryable = retryable;
 
     // Maintain proper stack trace
     if (Error.captureStackTrace) {
@@ -71,6 +74,25 @@ export class AgentError extends PolarisError {
     context: Record<string, any> | undefined = undefined
   ) {
     super(message, "AGENT_ERROR", context);
+  }
+}
+
+/**
+ * API/provider errors — retryable by default (rate limits, timeouts, transient failures)
+ */
+export class APIError extends PolarisError {
+  public readonly statusCode: number | undefined;
+
+  constructor(
+    message: string,
+    statusCode?: number,
+    context: Record<string, any> | undefined = undefined
+  ) {
+    const retryable = statusCode !== undefined
+      ? statusCode === 429 || statusCode >= 500
+      : true;
+    super(message, "API_ERROR", context, retryable);
+    this.statusCode = statusCode;
   }
 }
 

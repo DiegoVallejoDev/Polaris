@@ -20,6 +20,8 @@ import {
   LayerPipeline,
   LayerPipelineConfig,
 } from "./layer-pipeline";
+import { randomUUID } from "crypto";
+import { ProviderRateLimiters } from "../utils/rate-limiter";
 
 /**
  * Configuration for the PolarisEngine
@@ -98,11 +100,12 @@ export class PolarisEngine {
   private sentinelAgent?: SentinelAgent;
   private logger: Logger;
   private sessionId: string;
+  private cachedPipeline: LayerPipeline | undefined = undefined;
 
   constructor(config: PolarisEngineConfig) {
     this.config = { ...config };
     this.agents = new Map();
-    this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.sessionId = `session_${randomUUID()}`;
 
     // Initialize logger
     this.logger = new Logger(
@@ -280,6 +283,10 @@ export class PolarisEngine {
       this.sentinelAgent = updates.sentinelAgent;
     }
 
+    if (updates.pipelineConfig) {
+      this.cachedPipeline = undefined;
+    }
+
     this.logger.info("Configuration updated", updates);
   }
 
@@ -386,8 +393,10 @@ export class PolarisEngine {
       );
     }
 
-    const pipeline = new LayerPipeline(this.config.pipelineConfig);
-    const pipelineResult = await pipeline.execute(
+    if (!this.cachedPipeline) {
+      this.cachedPipeline = new LayerPipeline(this.config.pipelineConfig);
+    }
+    const pipelineResult = await this.cachedPipeline.execute(
       params.state,
       params.actions
     );
@@ -435,16 +444,19 @@ export class PolarisEngine {
       },
     };
 
-    // Attach pipeline-specific metadata
-    (engineOutput as any).pipelineResult = {
+    // Attach typed pipeline result
+    const pipelineOutput: NonNullable<typeof engineOutput.pipelineResult> = {
       finalOutput: pipelineResult.finalOutput,
       totalIterations: pipelineResult.totalIterations,
       forcedDelivery: pipelineResult.forcedDelivery,
-      forcedDeliveryReason: pipelineResult.forcedDeliveryReason,
       lastVerdict: pipelineResult.lastVerdict,
       iterationBreakdowns: pipelineResult.iterationBreakdowns,
       totalTokensConsumed: pipelineResult.totalTokensConsumed,
     };
+    if (pipelineResult.forcedDeliveryReason) {
+      pipelineOutput.forcedDeliveryReason = pipelineResult.forcedDeliveryReason;
+    }
+    engineOutput.pipelineResult = pipelineOutput;
 
     this.logger.info("Pipeline inference completed", {
       totalTime: totalInferenceTime,
@@ -528,32 +540,54 @@ export class PolarisEngine {
     actions?: Action[],
     _config?: PolarisEngineConfig["engineConfig"]
   ): Promise<MultiAgentOutput> {
-    const promises = agents.map(async (agent): Promise<AgentOutput> => {
-      try {
-        return await agent.evaluate(state, actions);
-      } catch (error) {
-        this.logger.warn(`Agent ${agent.id} failed`, error);
-        // Return error output
-        return {
-          agentId: agent.id,
-          agentName: agent.name,
-          providerType: agent.type,
-          evaluation: {
-            agentId: agent.id,
-            score: 0.5,
-            confidence: 0.1,
-            reasoning: `Agent failed: ${error}`,
-          },
-          timestamp: new Date().toISOString(),
-          error: {
-            hasError: true,
-            message: String(error),
-          },
-        };
-      }
-    });
+    const rateLimiter = ProviderRateLimiters.conservative();
 
-    const agentOutputs = await Promise.all(promises);
+    const results = await rateLimiter.scheduleAll(
+      agents.map((agent) => async (): Promise<AgentOutput> => {
+        try {
+          return await agent.evaluate(state, actions);
+        } catch (error) {
+          this.logger.warn(`Agent ${agent.id} failed`, error);
+          return {
+            agentId: agent.id,
+            agentName: agent.name,
+            providerType: agent.type,
+            evaluation: {
+              agentId: agent.id,
+              score: 0.5,
+              confidence: 0.1,
+              reasoning: `Agent failed: ${error}`,
+            },
+            timestamp: new Date().toISOString(),
+            error: {
+              hasError: true,
+              message: String(error),
+            },
+          };
+        }
+      })
+    );
+
+    const agentOutputs = results.map((result) =>
+      result.status === "fulfilled"
+        ? result.value
+        : {
+            agentId: "unknown",
+            agentName: "unknown",
+            providerType: "unknown",
+            evaluation: {
+              agentId: "unknown",
+              score: 0.5,
+              confidence: 0.1,
+              reasoning: `Agent scheduling failed: ${result.reason}`,
+            },
+            timestamp: new Date().toISOString(),
+            error: {
+              hasError: true,
+              message: String(result.reason),
+            },
+          }
+    );
 
     return this.buildMultiAgentOutput(agentOutputs);
   }

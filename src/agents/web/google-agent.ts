@@ -12,8 +12,8 @@ import { EnvironmentConfig } from "../../utils/config";
 import { PolarisError } from "../../errors/base";
 import { GoogleGenAI } from "@google/genai";
 
-export const DEFAULT_GOOGLE_NAME = "Gemini 2.5 pro";
-export const DEFAULT_GOOGLE_MODEL = "gemini-2.5-pro";
+export const DEFAULT_GOOGLE_NAME = "Gemini 3.5 Flash";
+export const DEFAULT_GOOGLE_MODEL = "gemini-3.5-flash";
 
 /**
  * Google-specific configuration
@@ -54,7 +54,7 @@ export class GoogleAgent extends BaseAgent {
       apiKey: config.apiKey || EnvironmentConfig.GOOGLE.apiKey,
       model: config.model || DEFAULT_GOOGLE_MODEL,
       maxTokens: config.maxTokens || 1000,
-      temperature: config.temperature || 0.7,
+      temperature: Math.max(0, Math.min(2, config.temperature || 0.7)),
     };
 
     super({
@@ -70,6 +70,14 @@ export class GoogleAgent extends BaseAgent {
     });
 
     this.config = baseConfig;
+
+    // Validate API key is present
+    if (!this.config.apiKey) {
+      throw new PolarisError(
+        "Google API key is required. Set GOOGLE_API_KEY environment variable or provide apiKey in config.",
+        "MISSING_API_KEY"
+      );
+    }
 
     // Initialize Google GenAI client
     this.client = new GoogleGenAI({ apiKey: this.config.apiKey });
@@ -173,7 +181,7 @@ export class GoogleAgent extends BaseAgent {
         gameStateId: gameState.id,
         processingTime,
         confidence: evaluation.confidence,
-        tokensUsed: (geminiResponse as any).usage?.totalTokens || 0,
+        tokensUsed: 0,
       });
 
       return output;
@@ -182,7 +190,7 @@ export class GoogleAgent extends BaseAgent {
       this.logger.errorSafe("Google evaluation failed", error);
 
       let errorMessage = String(error);
-      let errorMetadata: any = { error: true };
+      let errorMetadata: Record<string, boolean> = { error: true };
 
       if (error instanceof Error) {
         errorMessage = `Google API Error: ${error.message}`;
@@ -285,7 +293,7 @@ export class GoogleAgent extends BaseAgent {
     }
   }
 
-  private parseEvaluationResponse(response: any): EvaluationResult {
+  private parseEvaluationResponse(response: { text?: string | undefined }): EvaluationResult {
     const rawContent = response.text || "";
 
     try {
@@ -347,7 +355,7 @@ export class GoogleAgent extends BaseAgent {
     return trimmed;
   }
 
-  private validateScore(score: any): number {
+  private validateScore(score: unknown): number {
     const numScore = Number(score);
     if (isNaN(numScore) || numScore < 0 || numScore > 1) {
       this.logger.warn(`Invalid score received: ${score}, using default 0.5`);
@@ -356,7 +364,7 @@ export class GoogleAgent extends BaseAgent {
     return numScore;
   }
 
-  private validateConfidence(confidence: any): number {
+  private validateConfidence(confidence: unknown): number {
     const numConfidence = Number(confidence);
     if (isNaN(numConfidence) || numConfidence < 0 || numConfidence > 1) {
       this.logger.warn(

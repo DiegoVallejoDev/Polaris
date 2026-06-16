@@ -14,8 +14,8 @@ import { PolarisError } from "../../errors/base";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-export const DEFAULT_OPENAI_NAME = "GPT-4o";
-export const DEFAULT_OPENAI_MODEL = "gpt-4o";
+export const DEFAULT_OPENAI_NAME = "GPT-5.4 Mini";
+export const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
 
 /**
  * OpenAI-specific configuration
@@ -56,7 +56,7 @@ export class OpenAIAgent extends BaseAgent {
       apiKey: config.apiKey || EnvironmentConfig.OPENAI.apiKey,
       model: config.model || DEFAULT_OPENAI_MODEL,
       maxTokens: config.maxTokens || 1000,
-      temperature: config.temperature || 0.7,
+      temperature: Math.max(0, Math.min(2, config.temperature || 0.7)),
     };
 
     super({
@@ -72,6 +72,14 @@ export class OpenAIAgent extends BaseAgent {
     });
 
     this.config = baseConfig;
+
+    // Validate API key is present
+    if (!this.config.apiKey) {
+      throw new PolarisError(
+        "OpenAI API key is required. Set OPENAI_API_KEY environment variable or provide apiKey in config.",
+        "MISSING_API_KEY"
+      );
+    }
 
     // Initialize OpenAI client
     this.client = new OpenAI({
@@ -140,18 +148,15 @@ export class OpenAIAgent extends BaseAgent {
         },
       ];
 
-      const requestParams: any = {
-        model: this.config.model,
-        max_tokens: this.config.maxTokens,
-        messages,
-      };
-
-      if (this.config.temperature !== undefined) {
-        requestParams.temperature = this.config.temperature;
-      }
-
       const openAIResponse =
-        await this.client.chat.completions.create(requestParams);
+        await this.client.chat.completions.create({
+          model: this.config.model,
+          max_tokens: this.config.maxTokens,
+          messages,
+          ...(this.config.temperature !== undefined && {
+            temperature: this.config.temperature,
+          }),
+        });
 
       this.logger.debug("OpenAI response received", {
         response: openAIResponse,
@@ -333,7 +338,7 @@ export class OpenAIAgent extends BaseAgent {
     }
   }
 
-  private validateScore(score: any): number {
+  private validateScore(score: unknown): number {
     const numScore = Number(score);
     if (isNaN(numScore) || numScore < 0 || numScore > 1) {
       this.logger.warn(`Invalid score received: ${score}, using default 0.5`);
@@ -342,7 +347,7 @@ export class OpenAIAgent extends BaseAgent {
     return numScore;
   }
 
-  private validateConfidence(confidence: any): number {
+  private validateConfidence(confidence: unknown): number {
     const numConfidence = Number(confidence);
     if (isNaN(numConfidence) || numConfidence < 0 || numConfidence > 1) {
       this.logger.warn(
